@@ -1,21 +1,25 @@
 import { useEffect, useState } from 'react'
 
+// Dev: empty -> relative "/api/..." uses the Vite proxy.
+// Prod: Vercel sets this to the Render backend URL.
+const API = import.meta.env.VITE_API_BASE_URL ?? ''
+
 function App() {
   const [health, setHealth] = useState(null)
-  const [pings, setPings] = useState([])       // an array, starts empty
+  const [pings, setPings] = useState([])
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/health')
+    fetch(`${API}/api/health`)
       .then((r) => r.json())
       .then(setHealth)
       .catch((err) => setError(err.message))
 
-    fetch('/api/pings')
+    fetch(`${API}/api/pings`)
       .then((r) => r.json())
       .then(setPings)
       .catch((err) => setError(err.message))
-  }, [])                                        // run both once, on mount
+  }, [])
 
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
