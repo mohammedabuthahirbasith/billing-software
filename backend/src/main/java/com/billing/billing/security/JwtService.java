@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.billing.billing.model.User;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
@@ -28,12 +29,20 @@ public class JwtService {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
-                .subject(user.getEmail())          // "sub" claim: who the token is for
+                .subject(user.getEmail())
                 .claim("role", user.getRole().name())
                 .claim("userId", user.getId())
-                .issuedAt(now)                     // "iat"
-                .expiration(expiry)                // "exp"
-                .signWith(key)                     // sign with our secret → the signature
-                .compact();                        // produce header.payload.signature
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    public Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(key)          // verify signature with our secret
+                .build()
+                .parseSignedClaims(token) // throws if signature invalid or token expired
+                .getPayload();
     }
 }
