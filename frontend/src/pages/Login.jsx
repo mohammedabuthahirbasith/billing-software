@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { apiFetch, setToken } from '../api'
+import { apiFetch, setRole, setToken } from '../api'
+import Card from '../components/Card'
+import Field from '../components/Field'
+import Button from '../components/Button'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -17,26 +20,31 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       })
       setToken(data.token)   // save the JWT
+      setRole(data.role)     // used to conditionally show OWNER-only UI
       navigate('/')          // go to the protected home
     } catch (err) {
-      setError(`Invalid email or password${err}`)
+      setError(err.message)
     }
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: '4rem auto', fontFamily: 'sans-serif' }}>
-      <h1>Log in</h1>
-      <form onSubmit={handleSubmit}>
-        <input type="email" placeholder="Email" value={email}
-          onChange={(e) => setEmail(e.target.value)} required
-          style={{ display: 'block', width: '100%', marginBottom: 8, padding: 8 }} />
-        <input type="password" placeholder="Password" value={password}
-          onChange={(e) => setPassword(e.target.value)} required
-          style={{ display: 'block', width: '100%', marginBottom: 8, padding: 8 }} />
-        <button type="submit" style={{ padding: 8, width: '100%' }}>Log in</button>
-      </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <p>No account? <Link to="/register">Register</Link></p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <Card className="w-full max-w-sm">
+        <h1 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Log in</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Email" type="email" value={email}
+            onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <Field label="Password" type="password" value={password}
+            onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+          )}
+          <Button type="submit" className="w-full">Log in</Button>
+        </form>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          No account? <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">Register</Link>
+        </p>
+      </Card>
     </div>
   )
 }
