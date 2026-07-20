@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.billing.billing.dto.AuthResponse;
+import com.billing.billing.dto.CreateUserRequest;
 import com.billing.billing.dto.LoginRequest;
 import com.billing.billing.dto.RegisterRequest;
 import com.billing.billing.dto.UserResponse;
@@ -28,11 +29,20 @@ public class AuthService {
     }
 
     public UserResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        return createUser(request.email(), request.password(), Role.OWNER);
+    }
+
+    // OWNER-only, called from UserController — provisions a staff login (typically CASHIER).
+    public UserResponse createStaffUser(CreateUserRequest request) {
+        return createUser(request.email(), request.password(), request.role());
+    }
+
+    private UserResponse createUser(String email, String password, Role role) {
+        if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
-        String hashedPassword = passwordEncoder.encode(request.password());
-        User user = new User(request.email(), hashedPassword, Role.OWNER);
+        String hashedPassword = passwordEncoder.encode(password);
+        User user = new User(email, hashedPassword, role);
         User saved = userRepository.save(user);
         return new UserResponse(saved.getId(), saved.getEmail(), saved.getRole());
     }

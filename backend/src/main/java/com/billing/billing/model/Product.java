@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "products")
@@ -44,6 +45,12 @@ public class Product {
 
     private Instant updatedAt;
 
+    // Optimistic locking: makes concurrent stock decrements (from Invoice creation) fail fast
+    // with ObjectOptimisticLockingFailureException instead of silently losing an update.
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     protected Product() {} // for JPA
 
     public Product(String name, String sku, String description, BigDecimal price,
@@ -67,6 +74,7 @@ public class Product {
     public int getStockQuantity() { return stockQuantity; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Long getVersion() { return version; }
 
     public void setName(String name) { this.name = name; }
     public void setSku(String sku) { this.sku = sku; }
