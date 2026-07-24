@@ -31,6 +31,7 @@ export default function InvoiceList() {
                 <th className="px-4 py-3">Invoice #</th>
                 <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Created</th>
                 <th className="px-4 py-3"></th>
@@ -42,6 +43,7 @@ export default function InvoiceList() {
                   <td className="px-4 py-3 font-medium text-slate-900">{inv.invoiceNumber}</td>
                   <td className="px-4 py-3 text-slate-500">{inv.customerName || '—'}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(inv.totalAmount)}</td>
+                  <td className="px-4 py-3 text-slate-500">{inv.paymentMethod}</td>
                   <td className="px-4 py-3">
                     <Badge tone={inv.status === 'VOID' ? 'danger' : 'success'}>{inv.status}</Badge>
                   </td>
@@ -55,7 +57,7 @@ export default function InvoiceList() {
               ))}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">No invoices yet.</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No invoices yet.</td>
                 </tr>
               )}
             </tbody>

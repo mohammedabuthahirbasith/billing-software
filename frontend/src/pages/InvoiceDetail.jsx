@@ -45,6 +45,7 @@ export default function InvoiceDetail() {
 
         <div className="mt-4 border-t border-slate-200 pt-4 text-sm text-slate-600">
           <p>Customer: {invoice.customerName || '—'} {invoice.customerPhone ? `(${invoice.customerPhone})` : ''}</p>
+          <p className="mt-1">Payment: {invoice.paymentMethod}</p>
           {invoice.voidedAt && <p className="mt-1 text-rose-600">Voided: {formatDateTime(invoice.voidedAt)}</p>}
         </div>
 

@@ -6,6 +6,7 @@ import Field from '../components/Field'
 import Button from '../components/Button'
 
 export default function Register() {
+  const [storeName, setStoreName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -17,7 +18,7 @@ export default function Register() {
     try {
       await apiFetch('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ storeName, email, password }),
       })
       navigate('/login')
     } catch (err) {
@@ -30,6 +31,8 @@ export default function Register() {
       <Card className="w-full max-w-sm">
         <h1 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Register</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Store name" value={storeName}
+            onChange={(e) => setStoreName(e.target.value)} required autoComplete="organization" />
           <Field label="Email" type="email" value={email}
             onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           <Field label="Password" type="password" value={password} placeholder="Min 8 characters"

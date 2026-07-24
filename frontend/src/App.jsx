@@ -8,6 +8,7 @@ import InvoiceList from './pages/InvoiceList'
 import InvoiceForm from './pages/InvoiceForm'
 import InvoiceDetail from './pages/InvoiceDetail'
 import StaffForm from './pages/StaffForm'
+import Reports from './pages/Reports'
 import Layout from './components/Layout'
 import ProtectedRoute from './ProtectedRoute'
 import PublicRoute from './PublicRoute'
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/invoices/new" element={<InvoiceForm />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
           <Route path="/staff/new" element={<StaffForm />} />
+          <Route path="/reports" element={<Reports />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

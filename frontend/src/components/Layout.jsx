@@ -18,7 +18,9 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const isOwner = getRole() === 'OWNER'
-  const navLinks = isOwner ? [...BASE_NAV_LINKS, { to: '/staff/new', label: 'Add Staff' }] : BASE_NAV_LINKS
+  const navLinks = isOwner
+    ? [...BASE_NAV_LINKS, { to: '/reports', label: 'Reports' }, { to: '/staff/new', label: 'Add Staff' }]
+    : BASE_NAV_LINKS
 
   function handleLogout() {
     clearToken()

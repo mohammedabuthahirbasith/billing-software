@@ -21,7 +21,7 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
           Welcome, {user.email}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">Signed in as {user.role}</p>
+        <p className="mt-1 text-sm text-slate-500">{user.storeName} — Signed in as {user.role}</p>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">

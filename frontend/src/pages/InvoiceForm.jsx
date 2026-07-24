@@ -13,6 +13,7 @@ export default function InvoiceForm() {
   const [quantity, setQuantity] = useState('1')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [barcode, setBarcode] = useState('')
   const [barcodeError, setBarcodeError] = useState(null)
   const [error, setError] = useState(null)
@@ -86,6 +87,7 @@ export default function InvoiceForm() {
         body: JSON.stringify({
           customerName: customerName || null,
           customerPhone: customerPhone || null,
+          paymentMethod,
           items: cart.map(({ productId, quantity }) => ({ productId, quantity })),
         }),
       })
@@ -124,6 +126,12 @@ export default function InvoiceForm() {
             onChange={(e) => setCustomerName(e.target.value)} />
           <Field label="Customer phone (optional)" value={customerPhone}
             onChange={(e) => setCustomerPhone(e.target.value)} />
+          <Field as="select" label="Payment method" value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}>
+            <option value="CASH">Cash</option>
+            <option value="CARD">Card</option>
+            <option value="UPI">UPI</option>
+          </Field>
         </div>
 
         <div className="mt-6 border-t border-slate-200 pt-6">
