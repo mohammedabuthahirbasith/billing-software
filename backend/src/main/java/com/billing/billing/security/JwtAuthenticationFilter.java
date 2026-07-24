@@ -40,11 +40,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = claims.get("userId", Long.class);
                 Long storeId = claims.get("storeId", Long.class);
 
-                AuthenticatedUser principal = new AuthenticatedUser(userId, email, Role.valueOf(role), storeId);
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                // A token issued before storeId existed on the JWT (i.e. before the multi-tenancy
+                // deploy) has no storeId claim at all. Treat it as invalid rather than partially
+                // authenticating with a null store — every store-scoped code path assumes storeId
+                // is always present, and a null would surface as a 500 instead of a clean 401.
+                if (storeId != null) {
+                    AuthenticatedUser principal = new AuthenticatedUser(userId, email, Role.valueOf(role), storeId);
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                            principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             } catch (Exception e) {
                 // Invalid/expired token → leave unauthenticated; protected routes return 401
             }
