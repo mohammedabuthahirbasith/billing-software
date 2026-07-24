@@ -14,6 +14,7 @@ public record InvoiceSummaryResponse(
         BigDecimal taxAmount,
         BigDecimal totalAmount,
         String status,
+        String paymentMethod,
         Instant createdAt,
         Instant voidedAt
 ) {
@@ -27,6 +28,7 @@ public record InvoiceSummaryResponse(
                 invoice.getTaxAmount(),
                 invoice.getTotalAmount(),
                 invoice.getStatus().name(),
+                invoice.getPaymentMethod().name(),
                 invoice.getCreatedAt(),
                 invoice.getVoidedAt()
         );

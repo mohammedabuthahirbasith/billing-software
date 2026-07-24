@@ -21,8 +21,11 @@ import com.billing.billing.model.Invoice;
 import com.billing.billing.model.InvoiceItem;
 import com.billing.billing.model.InvoiceStatus;
 import com.billing.billing.model.Product;
+import com.billing.billing.model.Store;
 import com.billing.billing.repository.InvoiceRepository;
 import com.billing.billing.repository.ProductRepository;
+import com.billing.billing.repository.StoreRepository;
+import com.billing.billing.security.CurrentUser;
 
 @Service
 public class InvoiceService {
@@ -31,14 +34,18 @@ public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final ProductRepository productRepository;
+    private final StoreRepository storeRepository;
 
-    public InvoiceService(InvoiceRepository invoiceRepository, ProductRepository productRepository) {
+    public InvoiceService(InvoiceRepository invoiceRepository, ProductRepository productRepository,
+                           StoreRepository storeRepository) {
         this.invoiceRepository = invoiceRepository;
         this.productRepository = productRepository;
+        this.storeRepository = storeRepository;
     }
 
     @Transactional
     public InvoiceResponse create(InvoiceRequest request) {
+        Long storeId = CurrentUser.get().storeId();
         List<InvoiceItem> items = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
         BigDecimal taxAmount = BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
@@ -46,7 +53,10 @@ public class InvoiceService {
         // Duplicate productId across lines is allowed, not merged: each fetch returns the same
         // managed entity within this persistence context, so cumulative stock decrement is still correct.
         for (InvoiceItemRequest itemRequest : request.items()) {
-            Product product = productRepository.findById(itemRequest.productId())
+            // Store-scoped: this is what stops a request from referencing, and thus buying and
+            // decrementing stock on, another store's product (covers both the barcode-scan-by-SKU
+            // and manual-picker-by-id frontend flows, which both resolve to this one call site).
+            Product product = productRepository.findByIdAndStore_Id(itemRequest.productId(), storeId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Product not found: " + itemRequest.productId()));
 
@@ -88,15 +98,17 @@ public class InvoiceService {
                     "Stock changed concurrently on one or more items, please retry");
         }
 
+        Store store = storeRepository.getReferenceById(storeId);
         Invoice invoice = new Invoice(request.customerName(), request.customerPhone(),
-                subtotal, taxAmount, subtotal.add(taxAmount));
+                subtotal, taxAmount, subtotal.add(taxAmount), request.paymentMethod(), store);
         items.forEach(invoice::addItem);
 
         return InvoiceResponse.from(invoiceRepository.save(invoice));
     }
 
     public List<InvoiceSummaryResponse> getAll() {
-        return invoiceRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+        Long storeId = CurrentUser.get().storeId();
+        return invoiceRepository.findAllByStore_Id(storeId, Sort.by(Sort.Direction.DESC, "createdAt")).stream()
                 .map(InvoiceSummaryResponse::from)
                 .toList();
     }
@@ -138,7 +150,8 @@ public class InvoiceService {
     }
 
     private Invoice findInvoiceOrThrow(Long id) {
-        return invoiceRepository.findById(id)
+        Long storeId = CurrentUser.get().storeId();
+        return invoiceRepository.findByIdAndStore_Id(id, storeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id));
     }
 }

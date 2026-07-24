@@ -8,21 +8,29 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products", uniqueConstraints = @UniqueConstraint(columnNames = {"store_id", "sku"}))
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // No setter, updatable = false — a product's store is fixed at creation, same reasoning as User.store.
+    @ManyToOne
+    @JoinColumn(name = "store_id", nullable = false, updatable = false)
+    private Store store;
+
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, length = 100)
     private String sku;
 
     @Column(length = 1000)
@@ -54,7 +62,7 @@ public class Product {
     protected Product() {} // for JPA
 
     public Product(String name, String sku, String description, BigDecimal price,
-                   BigDecimal gstRate, String hsnCode, int stockQuantity) {
+                   BigDecimal gstRate, String hsnCode, int stockQuantity, Store store) {
         this.name = name;
         this.sku = sku;
         this.description = description;
@@ -62,9 +70,11 @@ public class Product {
         this.gstRate = gstRate;
         this.hsnCode = hsnCode;
         this.stockQuantity = stockQuantity;
+        this.store = store;
     }
 
     public Long getId() { return id; }
+    public Store getStore() { return store; }
     public String getName() { return name; }
     public String getSku() { return sku; }
     public String getDescription() { return description; }

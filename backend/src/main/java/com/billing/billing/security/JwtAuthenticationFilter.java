@@ -8,6 +8,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.billing.billing.model.Role;
+
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -35,9 +37,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtService.parseClaims(token);
                 String email = claims.getSubject();
                 String role = claims.get("role", String.class);
+                Long userId = claims.get("userId", Long.class);
+                Long storeId = claims.get("storeId", Long.class);
 
+                AuthenticatedUser principal = new AuthenticatedUser(userId, email, Role.valueOf(role), storeId);
                 var authentication = new UsernamePasswordAuthenticationToken(
-                        email, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                        principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (Exception e) {

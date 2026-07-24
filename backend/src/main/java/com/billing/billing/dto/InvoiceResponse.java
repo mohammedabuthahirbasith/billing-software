@@ -15,6 +15,7 @@ public record InvoiceResponse(
         BigDecimal taxAmount,
         BigDecimal totalAmount,
         String status,
+        String paymentMethod,
         Instant createdAt,
         Instant voidedAt,
         List<InvoiceItemResponse> items
@@ -29,6 +30,7 @@ public record InvoiceResponse(
                 invoice.getTaxAmount(),
                 invoice.getTotalAmount(),
                 invoice.getStatus().name(),
+                invoice.getPaymentMethod().name(),
                 invoice.getCreatedAt(),
                 invoice.getVoidedAt(),
                 invoice.getItems().stream().map(InvoiceItemResponse::from).toList()

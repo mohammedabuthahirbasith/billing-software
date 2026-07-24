@@ -9,6 +9,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -29,20 +31,28 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    // No setter, updatable = false — a user's store is fixed at creation. This is what guarantees
+    // a JWT's storeId claim can never go stale relative to the DB for the life of a token.
+    @ManyToOne
+    @JoinColumn(name = "store_id", nullable = false, updatable = false)
+    private Store store;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
     protected User() {} // for Hibernate
 
-    public User(String email, String passwordHash, Role role) {
+    public User(String email, String passwordHash, Role role, Store store) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.store = store;
     }
 
     public Long getId() { return id; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public Role getRole() { return role; }
+    public Store getStore() { return store; }
     public Instant getCreatedAt() { return createdAt; }
 }

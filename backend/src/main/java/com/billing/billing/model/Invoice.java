@@ -13,6 +13,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -24,6 +26,11 @@ public class Invoice {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // No setter, updatable = false — an invoice's store is fixed at creation, same reasoning as User.store.
+    @ManyToOne
+    @JoinColumn(name = "store_id", nullable = false, updatable = false)
+    private Store store;
 
     @Column(name = "customer_name")
     private String customerName;
@@ -44,6 +51,10 @@ public class Invoice {
     @Column(nullable = false, length = 20)
     private InvoiceStatus status = InvoiceStatus.COMPLETED;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 20)
+    private PaymentMethod paymentMethod;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -57,12 +68,15 @@ public class Invoice {
 
     protected Invoice() {} // for JPA
 
-    public Invoice(String customerName, String customerPhone, BigDecimal subtotal, BigDecimal taxAmount, BigDecimal totalAmount) {
+    public Invoice(String customerName, String customerPhone, BigDecimal subtotal, BigDecimal taxAmount,
+                   BigDecimal totalAmount, PaymentMethod paymentMethod, Store store) {
         this.customerName = customerName;
         this.customerPhone = customerPhone;
         this.subtotal = subtotal;
         this.taxAmount = taxAmount;
         this.totalAmount = totalAmount;
+        this.paymentMethod = paymentMethod;
+        this.store = store;
     }
 
     public void addItem(InvoiceItem item) {
@@ -71,12 +85,14 @@ public class Invoice {
     }
 
     public Long getId() { return id; }
+    public Store getStore() { return store; }
     public String getCustomerName() { return customerName; }
     public String getCustomerPhone() { return customerPhone; }
     public BigDecimal getSubtotal() { return subtotal; }
     public BigDecimal getTaxAmount() { return taxAmount; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public InvoiceStatus getStatus() { return status; }
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getVoidedAt() { return voidedAt; }
     public List<InvoiceItem> getItems() { return items; }
