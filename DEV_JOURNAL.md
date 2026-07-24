@@ -249,3 +249,99 @@ Mid-session, the backend's background dev process died unexpectedly (a stray int
 - **Keyboard-wedge scanning** is worth naming explicitly if asked "how does barcode support work" — it's a hardware/input-layer trick, not a computer-vision problem, and recognizing that distinction is what keeps this feature simple.
 - **Shared logic over shared UI** — the scan input and the dropdown picker look completely different, but they call the same `addItemToCart`. Consistency lived in the function, not in trying to make the two UIs identical.
 - **An index you already have is a feature you get for free** — this lookup didn't need new schema work because the uniqueness constraint on `sku` was already doing double duty as a performance index.
+
+---
+
+## 2026-07-22 — Payments: Record Payment Method at Time of Sale
+
+**Phase:** Core Domain — Point of Sale (Payments)
+**Files:** `V5__add_invoice_payment_method.sql`, `model/PaymentMethod.java`, `model/Invoice.java`, `dto/InvoiceRequest.java`, `dto/InvoiceResponse.java`, `dto/InvoiceSummaryResponse.java`, `service/InvoiceService.java`; frontend: `pages/InvoiceForm.jsx`, `pages/InvoiceList.jsx`, `pages/InvoiceDetail.jsx`
+
+### What it does
+
+Every invoice now records how it was paid — `CASH`, `CARD`, or `UPI` — captured as a required field right at checkout, alongside the rest of the sale. Shows up in the invoice list, the invoice detail page, and the API response.
+
+### Why it's written this way
+
+- **Payment at time of sale, not a separate "mark as paid" step.** Confirmed with the user up front: this matches how walk-in retail actually works — the customer pays right there at checkout. Kept the data model to a single required field on `Invoice` rather than a separate `Payment` entity, since split/partial payments were explicitly out of scope. No new domain concept, no new table — just a field that belongs exactly where the rest of the sale's facts already live.
+- **`DEFAULT 'CASH'` on the migration backfills history without a separate data migration.** Every invoice created before this feature existed still needs a valid, non-null value for the new `NOT NULL` column — verified this worked correctly: an invoice from two days ago now reports `paymentMethod: "CASH"` after the migration ran, with zero manual data massaging needed.
+- **Invalid enum values fail at JSON deserialization, before validation even runs** — sending `"paymentMethod": "BITCOIN"` doesn't need any new error-handling code to produce a clean 400; Jackson rejects the unknown enum value and the existing `spring.web.error.*` configuration (from the earlier stack-trace-leak fix) renders it as a proper message instead of a raw parse-exception dump. One more proof point that fix generalizes correctly to new fields, not just the cases it was originally written for.
+- **`voidInvoice()` needed zero changes.** Payment method is descriptive metadata about how a completed sale happened — voiding doesn't touch it, refund tracking is explicitly out of scope for this pass.
+
+### Interview talking points
+
+- **Backfilling a `NOT NULL` column safely** — a `DEFAULT` value on the `ALTER TABLE` statement handles existing rows automatically; the application layer's own validation (`@NotNull` on the request DTO) is what actually enforces the field going forward. Two different mechanisms, two different jobs — the DB default is a one-time historical safety net, not the real source of truth.
+- **Scope discipline** — payments *could* have meant partial payments, refunds, multiple tender types split across one sale. Confirming "one method, full amount, at time of sale" up front kept this to a single field instead of a new subsystem, and that was the right size for what was actually asked.
+
+---
+
+## 2026-07-22 — Sales Reports Dashboard
+
+**Phase:** Core Domain — Reporting
+**Files:** `V6__add_invoice_report_indexes.sql`, `repository/SalesSummaryRow.java`, `repository/PaymentMethodBreakdownRow.java`, `repository/TopProductRow.java`, `repository/InvoiceRepository.java`, `repository/InvoiceItemRepository.java`, `dto/SalesReportResponse.java`, `service/ReportService.java`, `controller/ReportController.java`; frontend: `pages/Reports.jsx`, `components/Layout.jsx`, `App.jsx`
+
+### What it does
+
+`GET /api/reports/sales?from=...&to=...&topN=10` (OWNER-only) returns total revenue/GST/subtotal, a completed-vs-voided invoice count, a breakdown by payment method, and a ranked top-products list, for any date range. The frontend adds quick presets (Today/This Week/This Month) plus a manual date range, four stat tiles, a payment-method bar comparison, and a top-products table.
+
+### Why it's written this way
+
+- **First feature in the codebase needing real SQL aggregation.** Everything before this was CRUD or single-row lookups. Got an independent design review specifically for the query layer before writing any code — worth it, since the first draft had several real bugs, not just style nits (below).
+- **Constructor-expression record projections, not interface projections.** A mismatched alias in an interface projection returns silent `null` at runtime, forever. A constructor expression fails at Hibernate bootstrap the moment the app starts if a type or argument doesn't line up — confirmed this directly: the app failed to start twice while iterating on the JPQL (nested-class FQN awkwardness), and each time the error was immediate and precise, not a mystery `null` discovered days later in production.
+- **`COALESCE` only where it's actually needed.** A bare aggregate with no `GROUP BY` always returns one row — `COUNT` is correctly `0` for zero matches, but `SUM` returns SQL `NULL`, an NPE waiting to happen. A `GROUP BY` query has the *opposite* problem: it doesn't return a null-filled row for an empty group, it omits the row entirely. Verified this directly — a live query against real data showed `CARD` (which had zero invoices in range) missing from the raw grouped result, requiring the service layer to explicitly fill in all three payment methods as zero rows rather than letting the frontend guess why one just vanished.
+- **`List<T>`, not `Page<T>`, for the top-products query.** Returning `Page<T>` here would silently run a second, wasted `COUNT(*)` query for a `getTotalElements()` value nothing reads, and passing a `Pageable` with a `Sort` gets validated against the entity metamodel instead of the query's own aggregate expression — a `PropertyReferenceException` waiting at runtime, not compile time. `ORDER BY` lives explicitly in the JPQL instead; the `Pageable` is unsorted and only contributes `LIMIT`/`OFFSET`.
+- **`Asia/Kolkata`, not UTC, for date-range boundaries.** This is an India-specific GST app — "today" has to mean the actual Indian retail day. Since `createdAt` is stored as `Instant` (zone-agnostic in Postgres), the only place this matters is where a `LocalDate` param gets converted to an `Instant` boundary — one shared constant, no DST edge cases since India has a fixed UTC+5:30 offset.
+- **`InvoiceItem`'s existing snapshot columns pay off again.** The top-products query joins `Invoice` (needed for the date/status filter) but never joins `Product` — `productName`/`sku` are already sitting right there on `InvoiceItem` from the Invoicing feature, for exactly this kind of historical-accuracy reason.
+- **Reports are OWNER-only**, matching the same reasoning as product management and invoice voiding: revenue and sales figures are business-sensitive, not a cashier's concern.
+- **Palette validated, not eyeballed, for the payment-method bars.** Ran the design system's color validator against two hand-picked candidate palettes first — both failed a colorblind-separation check outright. Used the reference palette's own pre-validated first three categorical slots instead (blue/orange/aqua), which are specifically confirmed to hold up across *all* pairs simultaneously, not just neighboring ones — the right bar for a chart where all three series sit on screen at once.
+
+### A live lint catch: setState inside an effect
+
+`Reports.jsx` initially called a shared `loadReport()` helper directly inside a mount `useEffect` — ESLint's `react-hooks/set-state-in-effect` rule flagged it immediately. Fixed by inlining the initial fetch as `apiFetch(...).then(setReport).catch(...)` directly in the effect (matching the exact pattern every other list page in this app already uses), and reserving the shared helper for the preset-button and custom-range event handlers, where calling setState has no such restriction.
+
+### Interview talking points
+
+- **Aggregate in the database, not in application code** — three `SUM`/`GROUP BY` queries instead of fetching every matching invoice and reducing in Java. Scales with data volume instead of against it, and is the difference between "works on my 10 test invoices" and "works."
+- **Fail-fast beats silent-wrong** — the constructor-expression vs. interface-projection choice is a small decision with an outsized payoff: a broken query announces itself at the next deploy, not via a support ticket months later asking why a report number looks off.
+- **`GROUP BY`'s "missing rows" gap is a classic, easy-to-miss bug class** — it's not about handling nulls, it's about handling *absence*. Anyone who's shipped a dashboard has a story about a category that silently vanished instead of showing zero.
+- **Index the columns your new access pattern actually scans** — this is the first feature doing a range scan instead of a PK lookup, and the migration that added the composite index went in in the same change, not as an afterthought once it got slow.
+
+---
+
+## 2026-07-24 — Multi-Tenancy Retrofit
+
+**Phase:** Core Architecture — Multi-Tenancy
+**Files:** `V7__add_multi_tenancy.sql`, `model/Store.java` (new), `model/User.java`, `model/Product.java`, `model/Invoice.java`, `security/AuthenticatedUser.java` (new), `security/CurrentUser.java` (new), `security/JwtService.java`, `security/JwtAuthenticationFilter.java`, `controller/MeController.java`, `repository/{Product,Invoice,InvoiceItem,Store}Repository.java`, `service/{Product,Invoice,Report,Auth}Service.java`, `dto/{RegisterRequest,UserResponse}.java`; frontend: `pages/Register.jsx`, `pages/Dashboard.jsx`
+
+### What it does
+
+Every store is now an isolated tenant. A `Store` row is the boundary; `users`, `products`, and `invoices` each carry a `store_id`. Signing up via `POST /api/auth/register` now provisions a brand-new store and its first OWNER together — self-serve SaaS onboarding, not just "add a user." Staff created via "Add Staff" join the creator's existing store, never a new one. All existing production data was migrated into one auto-created "Default Store" so nothing already live had to change hands.
+
+### Why it's written this way
+
+This is the highest-risk, largest-blast-radius change in the project's history — every prior feature was additive; this one retrofits isolation onto an already-deployed, already-populated single-tenant system, where a missed filter anywhere means one store's data leaks into another's. It went through an adversarial design review before any code was written, and that review caught two serious bugs that a normal read-through would very plausibly have missed:
+
+1. **`InvoiceService.getAll()` had no `@PreAuthorize` and called the inherited, unscoped `JpaRepository.findAll()`.** Harmless with one shared tenant; the instant a second store existed, every logged-in user of *any* store would see every invoice ever created by *any* store through a perfectly ordinary `GET /api/invoices`. Verified directly: before the fix, this would have been the single worst possible instance of the exact failure this whole feature exists to prevent.
+2. **`ProductRepository.findBySku()` (the barcode-scan lookup) was unscoped, and SKU uniqueness was moving from global to per-store.** Once two different stores legitimately use the same SKU, an unscoped lookup expecting `Optional<Product>` starts throwing `IncorrectResultSizeDataAccessException` — a 500 in ordinary daily use, not just under attack.
+
+Both are fixed by construction, not by remembering to check them:
+
+- **Delete-and-replace, not add-alongside, for repository methods that can be deleted.** `existsBySku`/`findBySku` were removed entirely rather than left next to their store-scoped replacements — this turns every call site that was missed into a **compile error** instead of a silent runtime leak. The two inherited methods that *can't* be deleted this way (`findAll()`/`findById()`) are the harder residual risk — every current call site is fixed, but nothing stops a future line of code from calling one directly. Noted explicitly as a known gap; an ArchUnit guard would close it permanently and is a good next step, not built in this pass.
+- **A custom JWT principal, not a bare email string.** `AuthenticatedUser` (userId, email, role, storeId) is decoded once by `JwtAuthenticationFilter` and set as the `Authentication`'s principal, with a static `CurrentUser.get()` helper reading it from `SecurityContextHolder`. This is what let every service method reach the current store with **zero controller signature changes anywhere** — only service method *bodies* gained a one-line `CurrentUser.get().storeId()` call. It also means `storeId` costs no extra DB query per request, the entire point of a stateless JWT.
+- **`AuthenticatedUser` implements `AuthenticatedPrincipal`, not just a bare record.** `Authentication.getName()` special-cases `UserDetails`/`AuthenticatedPrincipal` and falls back to `principal.toString()` for anything else — without this, `getName()` would silently start returning a record dump instead of the email for any caller. `MeController` was confirmed as today's only caller, but implementing the interface makes this robust against any future one too, not just the one found by inspection.
+- **No `store` setter anywhere, `updatable = false` on the column.** A user's (and product's, and invoice's) store is fixed at creation. Combined with no setter, a JWT's `storeId` claim structurally cannot go stale relative to the DB for the life of a token — the same accepted trade-off the existing `role` claim already carried, just extended to a second field, not a new risk class.
+- **No `DEFAULT` ever added to the new `store_id` columns**, even transiently. Nullable → backfill → `NOT NULL` with no default at any point in between means a future code path that forgets to set a store on insert *fails loudly*, rather than silently attributing a new tenant's row to "Default Store."
+- **The migration looks up the old `products.sku` unique constraint's name dynamically** (via `information_schema`) rather than assuming Postgres's naming convention — a one-shot migration against live production data doesn't get a second attempt if that guess were wrong.
+- **Email stays globally unique, not per-store**, stated as a deliberate choice: login has no store selector, and `findByEmail` is relied on everywhere to return at most one user. A person needing accounts at two different stores needs two different email addresses — a real, accepted limitation, not an oversight.
+
+### Two more real bugs, caught during verification, not by review
+
+`GET /api/me` 500'd with `Could not initialize proxy [Store#1] - no session` — the exact same class of bug as the earlier `InvoiceService.getById()` lazy-loading fix from the Invoicing feature, just in a new spot. `MeController.me()` used `storeRepository.getReferenceById(...)` (a lazy proxy, meant for FK-only writes) but then called `.getName()` on it — by the time that lazy field was actually accessed, the session was already closed. The identical bug was lurking in `AuthService.createStaffUser()` for the same reason: it used `getReferenceById` even though the shared `createUser()` helper it feeds always reads `store.getName()` for the response. Both fixed by switching to `findById` (an eager, fully-materialized fetch) — `getReferenceById`'s no-extra-query optimization only makes sense when a caller genuinely needs nothing but the id for an FK reference, which is true in `ProductService.create()`/`InvoiceService.create()` (left as `getReferenceById`, correctly) but was never true in either of these two spots.
+
+### Interview talking points
+
+- **Shared-schema multi-tenancy with a `store_id` discriminator** — the standard, simplest approach for this scale, versus schema-per-tenant or database-per-tenant, which buy stronger isolation at real operational cost (migrations run N times, connection pool per tenant, etc.) that isn't justified here.
+- **A design review is worth the most exactly where the blast radius is largest** — every other feature this session got a review pass too, but this is the one where "found two real, serious cross-tenant leaks before a single line was written" is a concrete, countable result, not a hypothetical benefit.
+- **Compile errors are a stronger correctness guarantee than a code review.** Deleting `existsBySku`/`findBySku` outright instead of leaving them alongside scoped replacements is a small technique with an outsized payoff: it converts "did the reviewer catch every call site" into "did it build."
+- **Statelessness has a real, nameable trade-off, not just a real, nameable benefit.** A JWT's `storeId` claim can't be revoked mid-lifetime short of waiting out its expiry — worth being able to say exactly what that trade-off is and why it was accepted (immutable store assignment by design), rather than discovering it looks like a bug later.
+- **The same bug class recurring is a signal, not a coincidence.** Two lazy-initialization-outside-a-session bugs in one project, in different files, both caught only by actually running the code — worth naming the pattern explicitly (`open-in-view=false` forces `@Transactional` discipline everywhere a lazy field crosses a service boundary) rather than treating each occurrence as an isolated one-off.
