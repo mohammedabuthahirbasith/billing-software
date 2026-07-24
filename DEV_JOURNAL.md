@@ -345,3 +345,39 @@ Both are fixed by construction, not by remembering to check them:
 - **Compile errors are a stronger correctness guarantee than a code review.** Deleting `existsBySku`/`findBySku` outright instead of leaving them alongside scoped replacements is a small technique with an outsized payoff: it converts "did the reviewer catch every call site" into "did it build."
 - **Statelessness has a real, nameable trade-off, not just a real, nameable benefit.** A JWT's `storeId` claim can't be revoked mid-lifetime short of waiting out its expiry — worth being able to say exactly what that trade-off is and why it was accepted (immutable store assignment by design), rather than discovering it looks like a bug later.
 - **The same bug class recurring is a signal, not a coincidence.** Two lazy-initialization-outside-a-session bugs in one project, in different files, both caught only by actually running the code — worth naming the pattern explicitly (`open-in-view=false` forces `@Transactional` discipline everywhere a lazy field crosses a service boundary) rather than treating each occurrence as an isolated one-off.
+
+---
+
+## 2026-07-24 — Post-Deploy Hardening: JWT Compatibility, an ArchUnit Guard, and Rate Limiting
+
+**Phase:** Core Architecture — Hardening
+**Files:** `security/JwtAuthenticationFilter.java`, `security/RegisterRateLimitFilter.java` (new), `security/SecurityConfig.java`, `pom.xml`, `test/architecture/RepositoryScopingArchTest.java` (new)
+
+With the original roadmap (auth, GST invoicing, payments, reports, multi-tenancy) fully shipped, this round wasn't a new feature — it was closing gaps the multi-tenancy retrofit either caused or knowingly deferred.
+
+### A real production bug, caught within minutes of deploy
+
+Right after the multi-tenancy migration went live, `GET /api/me` started 500ing for the account that had been logged in throughout testing. Root cause: that browser still held a JWT issued by the *old* `JwtService`, minted before the `storeId` claim existed. `JwtAuthenticationFilter` parsed it fine (signature still valid, nothing else about the token changed) and built an `AuthenticatedUser` with `storeId = null` — then `MeController` called `storeRepository.findById(null)`, which Spring Data rejects outright with `IllegalArgumentException`, surfacing as a 500 instead of a clean 401.
+
+This is the standard "old client, new server" problem that shows up whenever a JWT's payload shape changes: existing tokens don't retroactively gain new claims. Fixed at the filter level, not the controller level — if `storeId` is missing from a token's claims, the filter now simply doesn't authenticate the request at all, rather than authenticating it with a null field that every store-scoped code path assumes is always present. Verified directly: a fresh token still authenticates normally (`200`), a token with no `Authorization` header gets a clean `401`, and a garbage/malformed token also gets a clean `401` — none of the three paths crash.
+
+### Closing the one gap multi-tenancy couldn't close by construction
+
+The multi-tenancy retrofit deleted `existsBySku`/`findBySku` outright specifically so a missed call site would fail to *compile*, not fail silently at runtime — but `findAll()`/`findById()` are inherited from `JpaRepository` and can't be deleted the same way. That gap is now closed with an ArchUnit test: no class in `com.billing.billing.service` may call `findAll()`/`findById()` on any Spring Data repository (with `StoreRepository` deliberately excluded — `Store` *is* the tenant boundary, not tenant-owned data, so looking one up by the current user's own `storeId` from their JWT is never a cross-tenant risk, unlike `Product`/`Invoice`).
+
+Didn't just trust that the rule looked right — verified it two ways: it passes cleanly against the current codebase, and it actually *catches* a violation. Temporarily changed `ProductService.getAll()` back to a bare `productRepository.findAll()` (exactly the kind of regression this guard exists to prevent) and confirmed the build failed with the precise file and line, then reverted. A rule that only ever passes is worse than no rule — it looks like coverage without providing any.
+
+One iteration was needed to get there: the first version flagged `AuthService.createStaffUser()`'s `storeRepository.findById(...)` as a violation. That's a real distinction, not a false positive to shrug off — `Store` isn't a tenant-scoped *resource* the way `Product`/`Invoice` are, it's the tenant identity itself, and the id being looked up is always the caller's own `storeId`, never attacker-controlled. Excluding it by type (with the reasoning in a comment) keeps the guard meaningful instead of either missing real gaps or crying wolf on a safe pattern.
+
+### Rate limiting a bigger attack surface than it used to be
+
+`POST /api/auth/register` is `permitAll()` and, since multi-tenancy, provisions a whole new `Store` per request — a bigger blast radius than a typical "add a user row" signup endpoint, and worth defending against a scripted flood of fake stores. Added a simple in-memory per-IP fixed-window limiter (5 attempts/hour) as a servlet filter, deliberately not reaching for Redis or any distributed rate-limiting infrastructure this single-instance, free-tier deployment doesn't otherwise need. Reads `X-Forwarded-For` first (Render sits behind a proxy, so the raw socket address is the load balancer's, not the client's) falling back to the direct remote address. Verified directly: 5 rapid registrations succeed, the 6th gets a clean `429`, and unrelated routes like login are unaffected.
+
+Known, accepted simplification: the per-IP window map is never swept, so it grows with every distinct IP ever seen. Not worth a cleanup task at this project's actual traffic volume — and a free-tier host that sleeps/restarts on idle resets it anyway.
+
+### Interview talking points
+
+- **"Old client, new server" is a general JWT lesson, not a one-off bug** — any time a token's claim shape changes, existing tokens in the wild don't get the new claim, and the code path that consumes it needs to treat "claim is missing" as invalid, not as null-and-proceed.
+- **A guard rail is only as good as its proven failure mode** — writing an ArchUnit rule and trusting it compiles is not the same as knowing it fires. Deliberately breaking the code it's meant to catch, confirming the failure, then fixing it back is the actual verification step, the same discipline as testing a smoke detector by triggering it, not just checking the light is on.
+- **A false positive can be a correctness finding in disguise** — the `StoreRepository` exclusion wasn't papering over a flaky rule, it was the process forcing an explicit answer to "is Store tenant-owned data, or the tenant itself?" — a distinction worth having written down regardless of the test.
+- **Match infrastructure to actual scale** — an in-memory rate limiter with an unswept map is a real simplification, but it's the *correct* one for a single-instance deployment with this traffic profile; reaching for Redis here would be solving a problem the project doesn't have.

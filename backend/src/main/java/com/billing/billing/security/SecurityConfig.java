@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
                 ))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService),
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new RegisterRateLimitFilter(),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
