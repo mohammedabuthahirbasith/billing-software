@@ -18,11 +18,6 @@ export async function apiFetch(path, options = {}) {
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
 
-  if (res.status === 401) {          // token missing/expired
-    clearToken()
-    clearRole()
-    throw new Error('Unauthorized')
-  }
   if (!res.ok) {
     const text = await res.text()
     let message = text
@@ -32,6 +27,16 @@ export async function apiFetch(path, options = {}) {
     } catch {
       // not JSON — use raw text as-is
     }
+
+    // A 401 always means "this token is no longer good" (missing/expired/invalid) — clear it
+    // either way. But the MESSAGE shown to the user still comes from the response body above,
+    // not a hardcoded string, so a login failure surfaces its real "Invalid email or password"
+    // instead of a generic "Unauthorized" that only makes sense for an expired session.
+    if (res.status === 401) {
+      clearToken()
+      clearRole()
+    }
+
     throw new Error(message || `Request failed: ${res.status}`)
   }
   const text = await res.text()

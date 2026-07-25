@@ -20,3 +20,15 @@
 body {
   font-feature-settings: "cv11", "ss01";
 }
+
+/* A small "scanning barcode" pulse — used as the loading spinner on buttons, tying the loading
+   state back to this app's signature barcode-checkout feature instead of a generic circular spin. */
+@keyframes barcode-scan {
+  0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+  50%      { transform: scaleY(1);   opacity: 1; }
+}
+
+.barcode-bar {
+  animation: barcode-scan 0.9s ease-in-out infinite;
+  transform-origin: center;
+}

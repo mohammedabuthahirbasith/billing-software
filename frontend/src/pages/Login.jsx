@@ -4,6 +4,7 @@ import { apiFetch, setRole, setToken } from '../api'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
+  const showToast = useToast()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -23,6 +25,7 @@ export default function Login() {
       })
       setToken(data.token)   // save the JWT
       setRole(data.role)     // used to conditionally show OWNER-only UI
+      showToast('Welcome back!')
       navigate('/')          // go to the protected home
     } catch (err) {
       setError(err.message)

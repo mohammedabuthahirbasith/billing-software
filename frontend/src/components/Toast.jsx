@@ -26,13 +26,13 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={showToast}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2 px-4">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
         {toasts.map((t) => (
           <button
             key={t.id}
             onClick={() => dismiss(t.id)}
-            className={`pointer-events-auto w-full max-w-sm rounded-lg border px-4 py-2.5 text-left text-sm
-              font-medium shadow-md transition-opacity ${TONES[t.tone]}`}
+            className={`pointer-events-auto max-w-sm rounded-lg border px-4 py-2.5 text-left text-sm
+              font-medium shadow-lg transition-opacity ${TONES[t.tone]}`}
           >
             {t.message}
           </button>
