@@ -4,9 +4,11 @@ import { apiFetch, getRole } from '../api'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function StaffForm() {
   const navigate = useNavigate()
+  const showToast = useToast()
 
   useEffect(() => {
     if (getRole() !== 'OWNER') navigate('/')   // UX guard only — the backend is the real gate
@@ -16,23 +18,25 @@ export default function StaffForm() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('CASHIER')
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
+    setIsSubmitting(true)
     try {
       await apiFetch('/api/users', {
         method: 'POST',
         body: JSON.stringify({ email, password, role }),
       })
-      setSuccess(true)
+      showToast('Staff account created')
       setEmail('')
       setPassword('')
       setRole('CASHIER')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -51,10 +55,9 @@ export default function StaffForm() {
           </Field>
 
           {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
-          {success && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Account created.</p>}
 
           <div className="flex items-center gap-3 pt-2">
-            <Button type="submit">Create account</Button>
+            <Button type="submit" loading={isSubmitting}>Create account</Button>
             <Link to="/" className="text-sm font-medium text-slate-600 hover:text-slate-900">Back</Link>
           </div>
         </form>

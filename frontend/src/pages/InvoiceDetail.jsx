@@ -5,6 +5,7 @@ import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
 import Badge from '../components/Badge'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
@@ -12,7 +13,10 @@ export default function InvoiceDetail() {
   const [returns, setReturns] = useState([])
   const [returnQuantities, setReturnQuantities] = useState({})
   const [error, setError] = useState(null)
+  const [isVoiding, setIsVoiding] = useState(false)
+  const [isReturning, setIsReturning] = useState(false)
   const navigate = useNavigate()
+  const showToast = useToast()
   const isOwner = getRole() === 'OWNER'
 
   useEffect(() => {
@@ -37,11 +41,15 @@ export default function InvoiceDetail() {
   async function handleVoid() {
     if (!window.confirm('Void this invoice? This cannot be undone.')) return
     setError(null)
+    setIsVoiding(true)
     try {
       const updated = await apiFetch(`/api/invoices/${id}/void`, { method: 'POST' })
       setInvoice(updated)
+      showToast('Invoice voided')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setIsVoiding(false)
     }
   }
 
@@ -53,12 +61,16 @@ export default function InvoiceDetail() {
     if (items.length === 0) return
 
     setError(null)
+    setIsReturning(true)
     try {
-      await apiFetch(`/api/invoices/${id}/returns`, { method: 'POST', body: JSON.stringify({ items }) })
+      const result = await apiFetch(`/api/invoices/${id}/returns`, { method: 'POST', body: JSON.stringify({ items }) })
       setReturnQuantities({})
       await refresh()
+      showToast(`Return processed — refunded ${formatCurrency(result.refundTotal)}`)
     } catch (err) {
       setError(err.message)
+    } finally {
+      setIsReturning(false)
     }
   }
 
@@ -168,12 +180,12 @@ export default function InvoiceDetail() {
           <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>
           <div className="ml-auto flex items-center gap-3">
             {canReturn && (
-              <Button variant="secondary" disabled={!hasReturnInput} onClick={handleReturn}>
+              <Button variant="secondary" disabled={!hasReturnInput} loading={isReturning} onClick={handleReturn}>
                 Process Return
               </Button>
             )}
             {isOwner && invoice.status === 'COMPLETED' && (
-              <Button variant="danger" onClick={handleVoid}>Void invoice</Button>
+              <Button variant="danger" loading={isVoiding} onClick={handleVoid}>Void invoice</Button>
             )}
           </div>
         </div>

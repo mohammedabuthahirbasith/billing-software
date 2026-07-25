@@ -4,11 +4,13 @@ import { apiFetch } from '../api'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function ProductForm() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
+  const showToast = useToast()
 
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
@@ -18,6 +20,7 @@ export default function ProductForm() {
   const [hsnCode, setHsnCode] = useState('')
   const [stockQuantity, setStockQuantity] = useState('')
   const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!isEdit) return
@@ -37,6 +40,7 @@ export default function ProductForm() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
+    setIsSubmitting(true)
     const body = {
       name,
       sku,
@@ -49,12 +53,15 @@ export default function ProductForm() {
     try {
       if (isEdit) {
         await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+        showToast('Product updated')
       } else {
         await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) })
+        showToast('Product created')
       }
       navigate('/products')
     } catch (err) {
       setError(err.message)
+      setIsSubmitting(false)
     }
   }
 
@@ -85,7 +92,7 @@ export default function ProductForm() {
           {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
           <div className="flex items-center gap-3 pt-2">
-            <Button type="submit">{isEdit ? 'Save' : 'Create'}</Button>
+            <Button type="submit" loading={isSubmitting}>{isEdit ? 'Save' : 'Create'}</Button>
             <Link to="/products" className="text-sm font-medium text-slate-600 hover:text-slate-900">
               Cancel
             </Link>

@@ -4,11 +4,14 @@ import { apiFetch, getRole } from '../api'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function ProductList() {
   const [products, setProducts] = useState(null)
   const [error, setError] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
   const navigate = useNavigate()
+  const showToast = useToast()
   const isOwner = getRole() === 'OWNER'
 
   useEffect(() => {
@@ -20,11 +23,15 @@ export default function ProductList() {
   async function handleDelete(id) {
     if (!window.confirm('Delete this product?')) return
     setError(null)
+    setDeletingId(id)
     try {
       await apiFetch(`/api/products/${id}`, { method: 'DELETE' })
       setProducts((prev) => prev.filter((p) => p.id !== id))
+      showToast('Product deleted')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -64,8 +71,9 @@ export default function ProductList() {
                         <Link to={`/products/${p.id}/edit`} className="font-medium text-brand-600 hover:text-brand-700">
                           Edit
                         </Link>
-                        <button onClick={() => handleDelete(p.id)} className="font-medium text-rose-600 hover:text-rose-700">
-                          Delete
+                        <button onClick={() => handleDelete(p.id)} disabled={deletingId === p.id}
+                          className="font-medium text-rose-600 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
+                          {deletingId === p.id ? 'Deleting…' : 'Delete'}
                         </button>
                       </div>
                     </td>

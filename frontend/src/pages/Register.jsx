@@ -4,25 +4,31 @@ import { apiFetch } from '../api'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function Register() {
   const [storeName, setStoreName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
+  const showToast = useToast()
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
+    setIsSubmitting(true)
     try {
       await apiFetch('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ storeName, email, password }),
       })
+      showToast('Store registered — log in to continue')
       navigate('/login')
     } catch (err) {
       setError(err.message)
+      setIsSubmitting(false)
     }
   }
 
@@ -40,7 +46,7 @@ export default function Register() {
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
           )}
-          <Button type="submit" className="w-full">Create account</Button>
+          <Button type="submit" className="w-full" loading={isSubmitting}>Create account</Button>
         </form>
         <p className="mt-6 text-center text-sm text-slate-600">
           Have an account? <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">Log in</Link>

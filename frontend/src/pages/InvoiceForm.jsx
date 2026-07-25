@@ -5,6 +5,7 @@ import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import { useToast } from '../hooks/useToast'
 
 export default function InvoiceForm() {
   const [products, setProducts] = useState(null)
@@ -17,7 +18,9 @@ export default function InvoiceForm() {
   const [barcode, setBarcode] = useState('')
   const [barcodeError, setBarcodeError] = useState(null)
   const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
+  const showToast = useToast()
   const barcodeInputRef = useRef(null)
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export default function InvoiceForm() {
     e.preventDefault()
     setError(null)
     if (cart.length === 0) { setError('Add at least one item'); return }
+    setIsSubmitting(true)
     try {
       const invoice = await apiFetch('/api/invoices', {
         method: 'POST',
@@ -91,9 +95,11 @@ export default function InvoiceForm() {
           items: cart.map(({ productId, quantity }) => ({ productId, quantity })),
         }),
       })
+      showToast('Invoice created')
       navigate(`/invoices/${invoice.id}`)
     } catch (err) {
       setError(err.message)
+      setIsSubmitting(false)
     }
   }
 
@@ -196,7 +202,7 @@ export default function InvoiceForm() {
         {error && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
         <div className="mt-6 flex items-center gap-3">
-          <Button onClick={handleSubmit}>Create Invoice</Button>
+          <Button onClick={handleSubmit} loading={isSubmitting}>Create Invoice</Button>
           <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</Link>
         </div>
       </Card>

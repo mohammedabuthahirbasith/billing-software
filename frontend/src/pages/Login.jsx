@@ -9,11 +9,13 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
+    setIsSubmitting(true)
     try {
       const data = await apiFetch('/api/auth/login', {
         method: 'POST',
@@ -24,6 +26,7 @@ export default function Login() {
       navigate('/')          // go to the protected home
     } catch (err) {
       setError(err.message)
+      setIsSubmitting(false)
     }
   }
 
@@ -39,7 +42,7 @@ export default function Login() {
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
           )}
-          <Button type="submit" className="w-full">Log in</Button>
+          <Button type="submit" className="w-full" loading={isSubmitting}>Log in</Button>
         </form>
         <p className="mt-6 text-center text-sm text-slate-600">
           No account? <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">Register</Link>
