@@ -2,6 +2,7 @@ package com.billing.billing.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,10 @@ public interface InvoiceItemRepository extends JpaRepository<InvoiceItem, Long> 
     // in is already store-verified before this runs), not by the query's own design, so don't rely
     // on that discipline holding forever.
     boolean existsByProduct_IdAndProduct_Store_Id(Long productId, Long storeId);
+
+    // How ReturnService validates a requested invoiceItemId actually belongs to the target invoice,
+    // without loading the whole items collection just to filter one entry out of it.
+    Optional<InvoiceItem> findByIdAndInvoice_Id(Long id, Long invoiceId);
 
     // Joins Invoice (for status/createdAt/store filtering) but not Product — InvoiceItem already carries
     // denormalized productName/sku snapshot columns, so ii.product.id resolves straight to the FK

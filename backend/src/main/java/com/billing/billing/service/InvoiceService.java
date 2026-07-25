@@ -23,6 +23,7 @@ import com.billing.billing.model.InvoiceStatus;
 import com.billing.billing.model.Product;
 import com.billing.billing.model.Store;
 import com.billing.billing.repository.InvoiceRepository;
+import com.billing.billing.repository.InvoiceReturnRepository;
 import com.billing.billing.repository.ProductRepository;
 import com.billing.billing.repository.StoreRepository;
 import com.billing.billing.security.CurrentUser;
@@ -33,12 +34,14 @@ public class InvoiceService {
     private static final int MONEY_SCALE = 2;
 
     private final InvoiceRepository invoiceRepository;
+    private final InvoiceReturnRepository invoiceReturnRepository;
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
 
-    public InvoiceService(InvoiceRepository invoiceRepository, ProductRepository productRepository,
-                           StoreRepository storeRepository) {
+    public InvoiceService(InvoiceRepository invoiceRepository, InvoiceReturnRepository invoiceReturnRepository,
+                           ProductRepository productRepository, StoreRepository storeRepository) {
         this.invoiceRepository = invoiceRepository;
+        this.invoiceReturnRepository = invoiceReturnRepository;
         this.productRepository = productRepository;
         this.storeRepository = storeRepository;
     }
@@ -124,6 +127,14 @@ public class InvoiceService {
 
         if (invoice.getStatus() == InvoiceStatus.VOID) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invoice already voided: " + id);
+        }
+
+        // Voiding restocks each item's FULL original quantity below — if a partial return already
+        // restocked some units, voiding on top of that would double-restock them. Returns and void
+        // are made mutually exclusive on a given invoice rather than reconciling the two restock
+        // paths against each other.
+        if (invoiceReturnRepository.existsByInvoice_Id(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot void an invoice with existing returns: " + id);
         }
 
         // Restore stock for every line. Two concurrent voids of the same invoice collide on Product's

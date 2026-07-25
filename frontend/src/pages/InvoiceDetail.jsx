@@ -9,15 +9,30 @@ import Button from '../components/Button'
 export default function InvoiceDetail() {
   const { id } = useParams()
   const [invoice, setInvoice] = useState(null)
+  const [returns, setReturns] = useState([])
+  const [returnQuantities, setReturnQuantities] = useState({})
   const [error, setError] = useState(null)
   const navigate = useNavigate()
   const isOwner = getRole() === 'OWNER'
 
   useEffect(() => {
-    apiFetch(`/api/invoices/${id}`)
-      .then(setInvoice)
+    Promise.all([apiFetch(`/api/invoices/${id}`), apiFetch(`/api/invoices/${id}/returns`)])
+      .then(([invoiceData, returnsData]) => {
+        setInvoice(invoiceData)
+        setReturns(returnsData)
+      })
       .catch(() => navigate('/invoices'))
-  }, [id, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  async function refresh() {
+    const [invoiceData, returnsData] = await Promise.all([
+      apiFetch(`/api/invoices/${id}`),
+      apiFetch(`/api/invoices/${id}/returns`),
+    ])
+    setInvoice(invoiceData)
+    setReturns(returnsData)
+  }
 
   async function handleVoid() {
     if (!window.confirm('Void this invoice? This cannot be undone.')) return
@@ -30,7 +45,37 @@ export default function InvoiceDetail() {
     }
   }
 
+  async function handleReturn() {
+    const items = Object.entries(returnQuantities)
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([invoiceItemId, qty]) => ({ invoiceItemId: Number(invoiceItemId), quantity: Number(qty) }))
+
+    if (items.length === 0) return
+
+    setError(null)
+    try {
+      await apiFetch(`/api/invoices/${id}/returns`, { method: 'POST', body: JSON.stringify({ items }) })
+      setReturnQuantities({})
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   if (!invoice) return <p className="text-slate-500">Loading…</p>
+
+  // Client-side display hint only — the backend's own aggregate query is the sole source of truth
+  // for accepting/rejecting a return, so this can never diverge into a real correctness bug even if
+  // it were ever stale.
+  const returnedByItemId = {}
+  for (const ret of returns) {
+    for (const item of ret.items) {
+      returnedByItemId[item.invoiceItemId] = (returnedByItemId[item.invoiceItemId] || 0) + item.quantityReturned
+    }
+  }
+
+  const canReturn = isOwner && invoice.status === 'COMPLETED'
+  const hasReturnInput = Object.values(returnQuantities).some((qty) => Number(qty) > 0)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -60,20 +105,42 @@ export default function InvoiceDetail() {
                 <th className="px-4 py-2 text-right">GST %</th>
                 <th className="px-4 py-2 text-right">Qty</th>
                 <th className="px-4 py-2 text-right">Line Total</th>
+                <th className="px-4 py-2 text-right">Returnable</th>
+                {canReturn && <th className="px-4 py-2 text-right">Return Qty</th>}
               </tr>
             </thead>
             <tbody>
-              {invoice.items.map((item, i) => (
-                <tr key={i} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-2 font-medium text-slate-900">{item.productName}</td>
-                  <td className="px-4 py-2 text-slate-500">{item.sku}</td>
-                  <td className="px-4 py-2 text-slate-500">{item.hsnCode || '—'}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{item.gstRate}%</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{item.quantity}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.lineTotal)}</td>
-                </tr>
-              ))}
+              {invoice.items.map((item) => {
+                const remaining = item.quantity - (returnedByItemId[item.id] || 0)
+                return (
+                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
+                    <td className="px-4 py-2 font-medium text-slate-900">{item.productName}</td>
+                    <td className="px-4 py-2 text-slate-500">{item.sku}</td>
+                    <td className="px-4 py-2 text-slate-500">{item.hsnCode || '—'}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{item.gstRate}%</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{item.quantity}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.lineTotal)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-500">{remaining}</td>
+                    {canReturn && (
+                      <td className="px-4 py-2 text-right">
+                        {remaining > 0 && (
+                          <input
+                            type="number"
+                            min="0"
+                            max={remaining}
+                            value={returnQuantities[item.id] ?? ''}
+                            onChange={(e) =>
+                              setReturnQuantities((prev) => ({ ...prev, [item.id]: e.target.value }))
+                            }
+                            className="w-16 rounded border border-slate-300 px-2 py-1 text-right tabular-nums focus:border-brand-500 focus:outline-none"
+                          />
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -99,11 +166,43 @@ export default function InvoiceDetail() {
 
         <div className="mt-6 flex items-center gap-3 border-t border-slate-200 pt-6">
           <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>
-          {isOwner && invoice.status === 'COMPLETED' && (
-            <Button variant="danger" className="ml-auto" onClick={handleVoid}>Void invoice</Button>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {canReturn && (
+              <Button variant="secondary" disabled={!hasReturnInput} onClick={handleReturn}>
+                Process Return
+              </Button>
+            )}
+            {isOwner && invoice.status === 'COMPLETED' && (
+              <Button variant="danger" onClick={handleVoid}>Void invoice</Button>
+            )}
+          </div>
         </div>
       </Card>
+
+      {returns.length > 0 && (
+        <Card className="mt-6">
+          <h2 className="text-lg font-semibold text-slate-900">Return History</h2>
+          <div className="mt-4 space-y-4">
+            {returns.map((ret) => (
+              <div key={ret.id} className="rounded-lg border border-slate-200 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">{formatDateTime(ret.createdAt)}</span>
+                  <span className="font-semibold text-slate-900">
+                    Refunded {formatCurrency(ret.refundTotal)}
+                  </span>
+                </div>
+                <ul className="mt-2 space-y-1 text-slate-600">
+                  {ret.items.map((item) => (
+                    <li key={item.invoiceItemId}>
+                      {item.quantityReturned} × {item.productName} ({item.sku}) — {formatCurrency(item.lineTotalRefund)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

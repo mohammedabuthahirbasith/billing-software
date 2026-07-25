@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import com.billing.billing.model.InvoiceItem;
 
 public record InvoiceItemResponse(
+        Long id,
         Long productId,
         String productName,
         String sku,
@@ -18,6 +19,7 @@ public record InvoiceItemResponse(
 ) {
     public static InvoiceItemResponse from(InvoiceItem item) {
         return new InvoiceItemResponse(
+                item.getId(),
                 item.getProduct().getId(),
                 item.getProductName(),
                 item.getSku(),
