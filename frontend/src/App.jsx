@@ -11,32 +11,35 @@ import StaffForm from './pages/StaffForm'
 import Reports from './pages/Reports'
 import Layout from './components/Layout'
 import { ToastProvider } from './components/Toast'
+import { ConfirmProvider } from './components/ConfirmDialog'
 import ProtectedRoute from './ProtectedRoute'
 import PublicRoute from './PublicRoute'
 
 export default function App() {
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <ConfirmProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/products" element={<ProductList />} />
-            <Route path="/products/new" element={<ProductForm />} />
-            <Route path="/products/:id/edit" element={<ProductForm />} />
-            <Route path="/invoices" element={<InvoiceList />} />
-            <Route path="/invoices/new" element={<InvoiceForm />} />
-            <Route path="/invoices/:id" element={<InvoiceDetail />} />
-            <Route path="/staff/new" element={<StaffForm />} />
-            <Route path="/reports" element={<Reports />} />
-          </Route>
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/products" element={<ProductList />} />
+              <Route path="/products/new" element={<ProductForm />} />
+              <Route path="/products/:id/edit" element={<ProductForm />} />
+              <Route path="/invoices" element={<InvoiceList />} />
+              <Route path="/invoices/new" element={<InvoiceForm />} />
+              <Route path="/invoices/:id" element={<InvoiceDetail />} />
+              <Route path="/staff/new" element={<StaffForm />} />
+              <Route path="/reports" element={<Reports />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ConfirmProvider>
     </ToastProvider>
   )
 }

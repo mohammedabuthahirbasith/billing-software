@@ -7,6 +7,7 @@ import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 export default function InvoiceForm() {
   const [products, setProducts] = useState(null)
@@ -22,6 +23,7 @@ export default function InvoiceForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
   const showToast = useToast()
+  const confirm = useConfirm()
   const barcodeInputRef = useRef(null)
 
   useEffect(() => {
@@ -105,6 +107,19 @@ export default function InvoiceForm() {
   }
 
   const estimatedSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const isDirty = cart.length > 0 || customerName.trim() !== '' || customerPhone.trim() !== ''
+
+  async function handleCancelClick(e) {
+    if (!isDirty) return   // let the Link navigate normally
+    e.preventDefault()
+    const ok = await confirm({
+      title: 'Discard this invoice?',
+      message: 'The items and details you entered will be lost.',
+      confirmLabel: 'Discard',
+      danger: true,
+    })
+    if (ok) navigate('/invoices')
+  }
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -204,7 +219,7 @@ export default function InvoiceForm() {
 
         <div className="mt-6 flex items-center gap-3">
           <Button onClick={handleSubmit} loading={isSubmitting}>Create Invoice</Button>
-          <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</Link>
+          <Link to="/invoices" onClick={handleCancelClick} className="text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</Link>
         </div>
       </Card>
     </div>

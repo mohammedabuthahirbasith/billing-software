@@ -449,3 +449,27 @@ After the fixes above, the spinner still didn't show up on any action. The code 
 The fix is a small, deliberately artificial one: `withMinDelay()` wraps the request promise in a `Promise.allSettled` alongside a fixed timer, so the combined await never resolves faster than ~350ms regardless of how fast the actual response was, while still surfacing the real result (or the real error) once both are done. Applied at all seven action call sites that already had a loading flag. This is a well-established pattern for exactly this problem — deliberately padding a fast response so a "this is working" signal is reliably perceivable — not a workaround specific to this app, and it means the spinner behaves identically whether the backend is on the same machine or across a real network.
 
 **Interview talking point:** a loading indicator's job is *perceptual*, not just technically correct — code that flips a boolean at exactly the right two moments can still fail its actual purpose if those two moments are closer together than a screen can render. Worth checking not just "does the state change happen" but "is there guaranteed to be a paintable frame where it's visible."
+
+---
+
+## 2026-07-26 — Replacing Native Dialogs: Custom Confirm + Discard-Unsaved-Changes
+
+**Phase:** Frontend — Cross-Cutting UX
+**Files:** `components/ConfirmDialog.jsx` (new), `contexts/confirmContext.js` (new), `hooks/useConfirm.js` (new), `App.jsx`, `ProductList.jsx`, `InvoiceDetail.jsx`, `ProductForm.jsx`, `InvoiceForm.jsx`, `StaffForm.jsx`
+
+### What it does
+
+Two remaining `window.confirm()` calls (deleting a product, voiding an invoice) are replaced with a styled, in-app confirmation dialog matching the rest of the design system. Separately, every form's Cancel/Back link now asks before discarding unsaved input, instead of silently navigating away and losing it.
+
+### Why it's written this way
+
+- **One imperative `confirm()` function, not a dialog-state dance on every page.** Modeled directly on the `useToast()` pattern already established: `ConfirmProvider` holds at most one pending request and exposes a single `confirm(options)` function through context, returning a `Promise<boolean>` that resolves when the user picks an option. Every call site becomes `const ok = await confirm({...}); if (!ok) return` — a drop-in replacement for `window.confirm()`'s shape, so no page needed its own dialog-open boolean, position, or render logic.
+- **A generic "is this dirty" check per form, not a shared abstraction across all of them.** `ProductForm` needed a real wrapper (`field(setter)`) because its edit mode pre-populates every field from a fetch on load, and that initial population must not itself count as a user change. `InvoiceForm` and `StaffForm` never pre-populate anything, so their dirty check is just a plain derived boolean (cart non-empty, or any field non-blank) — building one shared "form dirtiness" hook would have forced the no-prefill pages to carry machinery they don't need to solve a problem only one page actually has.
+- **`InvoiceDetail`'s "← Invoices" link protects the *return quantities*, not the invoice itself.** The invoice and its items are immutable and already saved — there's nothing about *them* to lose. What's actually at risk of being silently discarded is whatever the user typed into the return-quantity inputs but hadn't submitted yet, so that's what the dirty check (`hasReturnInput`, already computed for the Process Return button) protects.
+- **`Link`'s own `onClick` handler is the gate, not a replacement navigation mechanism.** Every protected Cancel/Back link stays a real `<Link>` (so it's still a real anchor, keyboard-accessible, right-clickable, etc.) — the `onClick` handler only calls `e.preventDefault()` when the form is actually dirty, and manually calls `navigate()` after the user confirms. When there's nothing to lose, the handler returns immediately without calling `preventDefault`, and the `Link` behaves exactly as it always did.
+
+### Interview talking points
+
+- **An imperative, promise-based confirmation API is a recognized alternative to modal-state-per-component**, used in several production UI libraries for exactly this reason: the calling code reads as a straight-line sequence (ask → check the answer → proceed), instead of splitting the "ask" and "handle the answer" across a render cycle boundary.
+- **Not every "unsaved changes" check needs the same shape.** Recognizing that `ProductForm`'s prefill-vs-user-edit distinction was a *real, page-specific* problem — not a case for a one-size-fits-all "track every field" hook — kept the two simpler forms simple.
+- **Protecting the right *data*, not just "the form," matters.** `InvoiceDetail` has no traditional form to protect, but it does have transient, not-yet-submitted user input sitting in component state; recognizing that and gating on `hasReturnInput` specifically (rather than skipping the page because "it's not really a form") is what made the protection apply to the thing actually at risk.

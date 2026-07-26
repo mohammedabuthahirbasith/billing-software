@@ -6,10 +6,12 @@ import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 export default function StaffForm() {
   const navigate = useNavigate()
   const showToast = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     if (getRole() !== 'OWNER') navigate('/')   // UX guard only — the backend is the real gate
@@ -41,6 +43,18 @@ export default function StaffForm() {
     }
   }
 
+  async function handleBackClick(e) {
+    if (!email && !password) return   // let the Link navigate normally
+    e.preventDefault()
+    const ok = await confirm({
+      title: 'Discard changes?',
+      message: 'You have unsaved changes that will be lost.',
+      confirmLabel: 'Discard',
+      danger: true,
+    })
+    if (ok) navigate('/')
+  }
+
   return (
     <div className="mx-auto max-w-md">
       <Card>
@@ -59,7 +73,7 @@ export default function StaffForm() {
 
           <div className="flex items-center gap-3 pt-2">
             <Button type="submit" loading={isSubmitting}>Create account</Button>
-            <Link to="/" className="text-sm font-medium text-slate-600 hover:text-slate-900">Back</Link>
+            <Link to="/" onClick={handleBackClick} className="text-sm font-medium text-slate-600 hover:text-slate-900">Back</Link>
           </div>
         </form>
       </Card>

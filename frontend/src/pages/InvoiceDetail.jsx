@@ -7,6 +7,7 @@ import Card from '../components/Card'
 import Badge from '../components/Badge'
 import Button from '../components/Button'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
@@ -18,6 +19,7 @@ export default function InvoiceDetail() {
   const [isReturning, setIsReturning] = useState(false)
   const navigate = useNavigate()
   const showToast = useToast()
+  const confirm = useConfirm()
   const isOwner = getRole() === 'OWNER'
 
   useEffect(() => {
@@ -40,7 +42,13 @@ export default function InvoiceDetail() {
   }
 
   async function handleVoid() {
-    if (!window.confirm('Void this invoice? This cannot be undone.')) return
+    const ok = await confirm({
+      title: 'Void this invoice?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Void invoice',
+      danger: true,
+    })
+    if (!ok) return
     setError(null)
     setIsVoiding(true)
     try {
@@ -89,6 +97,18 @@ export default function InvoiceDetail() {
 
   const canReturn = isOwner && invoice.status === 'COMPLETED'
   const hasReturnInput = Object.values(returnQuantities).some((qty) => Number(qty) > 0)
+
+  async function handleBackClick(e) {
+    if (!hasReturnInput) return   // let the Link navigate normally
+    e.preventDefault()
+    const ok = await confirm({
+      title: 'Discard return quantities?',
+      message: "You've entered return quantities that haven't been submitted yet.",
+      confirmLabel: 'Discard',
+      danger: true,
+    })
+    if (ok) navigate('/invoices')
+  }
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -178,7 +198,7 @@ export default function InvoiceDetail() {
         {error && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
         <div className="mt-6 flex items-center gap-3 border-t border-slate-200 pt-6">
-          <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>
+          <Link to="/invoices" onClick={handleBackClick} className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>
           <div className="ml-auto flex items-center gap-3">
             {canReturn && (
               <Button variant="secondary" disabled={!hasReturnInput} loading={isReturning} onClick={handleReturn}>

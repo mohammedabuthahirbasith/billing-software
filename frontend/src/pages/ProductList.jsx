@@ -6,6 +6,7 @@ import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 export default function ProductList() {
   const [products, setProducts] = useState(null)
@@ -13,6 +14,7 @@ export default function ProductList() {
   const [deletingId, setDeletingId] = useState(null)
   const navigate = useNavigate()
   const showToast = useToast()
+  const confirm = useConfirm()
   const isOwner = getRole() === 'OWNER'
 
   useEffect(() => {
@@ -21,8 +23,14 @@ export default function ProductList() {
       .catch(() => navigate('/login'))
   }, [navigate])
 
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this product?')) return
+  async function handleDelete(id, name) {
+    const ok = await confirm({
+      title: 'Delete this product?',
+      message: `"${name}" will be permanently removed. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     setError(null)
     setDeletingId(id)
     try {
@@ -72,7 +80,7 @@ export default function ProductList() {
                         <Link to={`/products/${p.id}/edit`} className="font-medium text-brand-600 hover:text-brand-700">
                           Edit
                         </Link>
-                        <button onClick={() => handleDelete(p.id)} disabled={deletingId === p.id}
+                        <button onClick={() => handleDelete(p.id, p.name)} disabled={deletingId === p.id}
                           className="font-medium text-rose-600 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50">
                           {deletingId === p.id ? 'Deleting…' : 'Delete'}
                         </button>
