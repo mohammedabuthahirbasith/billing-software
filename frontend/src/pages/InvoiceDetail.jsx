@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
 import Badge from '../components/Badge'
@@ -43,7 +44,7 @@ export default function InvoiceDetail() {
     setError(null)
     setIsVoiding(true)
     try {
-      const updated = await apiFetch(`/api/invoices/${id}/void`, { method: 'POST' })
+      const updated = await withMinDelay(apiFetch(`/api/invoices/${id}/void`, { method: 'POST' }))
       setInvoice(updated)
       showToast('Invoice voided')
     } catch (err) {
@@ -63,7 +64,7 @@ export default function InvoiceDetail() {
     setError(null)
     setIsReturning(true)
     try {
-      const result = await apiFetch(`/api/invoices/${id}/returns`, { method: 'POST', body: JSON.stringify({ items }) })
+      const result = await withMinDelay(apiFetch(`/api/invoices/${id}/returns`, { method: 'POST', body: JSON.stringify({ items }) }))
       setReturnQuantities({})
       await refresh()
       showToast(`Return processed — refunded ${formatCurrency(result.refundTotal)}`)

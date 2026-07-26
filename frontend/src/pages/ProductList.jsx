@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
@@ -25,7 +26,7 @@ export default function ProductList() {
     setError(null)
     setDeletingId(id)
     try {
-      await apiFetch(`/api/products/${id}`, { method: 'DELETE' })
+      await withMinDelay(apiFetch(`/api/products/${id}`, { method: 'DELETE' }))
       setProducts((prev) => prev.filter((p) => p.id !== id))
       showToast('Product deleted')
     } catch (err) {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, setRole, setToken } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
@@ -19,10 +20,10 @@ export default function Login() {
     setError(null)
     setIsSubmitting(true)
     try {
-      const data = await apiFetch('/api/auth/login', {
+      const data = await withMinDelay(apiFetch('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
-      })
+      }))
       setToken(data.token)   // save the JWT
       setRole(data.role)     // used to conditionally show OWNER-only UI
       showToast('Welcome back!')

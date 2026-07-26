@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Field from '../components/Field'
@@ -86,7 +87,7 @@ export default function InvoiceForm() {
     if (cart.length === 0) { setError('Add at least one item'); return }
     setIsSubmitting(true)
     try {
-      const invoice = await apiFetch('/api/invoices', {
+      const invoice = await withMinDelay(apiFetch('/api/invoices', {
         method: 'POST',
         body: JSON.stringify({
           customerName: customerName || null,
@@ -94,7 +95,7 @@ export default function InvoiceForm() {
           paymentMethod,
           items: cart.map(({ productId, quantity }) => ({ productId, quantity })),
         }),
-      })
+      }))
       showToast('Invoice created')
       navigate(`/invoices/${invoice.id}`)
     } catch (err) {

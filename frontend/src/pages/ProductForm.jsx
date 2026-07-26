@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
@@ -52,10 +53,10 @@ export default function ProductForm() {
     }
     try {
       if (isEdit) {
-        await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+        await withMinDelay(apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }))
         showToast('Product updated')
       } else {
-        await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) })
+        await withMinDelay(apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) }))
         showToast('Product created')
       }
       navigate('/products')

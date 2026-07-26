@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
@@ -25,10 +26,10 @@ export default function StaffForm() {
     setError(null)
     setIsSubmitting(true)
     try {
-      await apiFetch('/api/users', {
+      await withMinDelay(apiFetch('/api/users', {
         method: 'POST',
         body: JSON.stringify({ email, password, role }),
-      })
+      }))
       showToast('Staff account created')
       setEmail('')
       setPassword('')

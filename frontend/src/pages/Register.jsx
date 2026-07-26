@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
@@ -20,10 +21,10 @@ export default function Register() {
     setError(null)
     setIsSubmitting(true)
     try {
-      await apiFetch('/api/auth/register', {
+      await withMinDelay(apiFetch('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({ storeName, email, password }),
-      })
+      }))
       showToast('Store registered — log in to continue')
       navigate('/login')
     } catch (err) {
