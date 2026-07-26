@@ -4,17 +4,29 @@
 @theme {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand accent aliases onto Tailwind's built-in indigo scale */
-  --color-brand-50: var(--color-indigo-50);
-  --color-brand-100: var(--color-indigo-100);
-  --color-brand-200: var(--color-indigo-200);
-  --color-brand-300: var(--color-indigo-300);
-  --color-brand-400: var(--color-indigo-400);
-  --color-brand-500: var(--color-indigo-500);
-  --color-brand-600: var(--color-indigo-600);
-  --color-brand-700: var(--color-indigo-700);
-  --color-brand-800: var(--color-indigo-800);
-  --color-brand-900: var(--color-indigo-900);
+  /* Brand accent — a bright fintech blue (~#1668E3), the industry-standard "trust" color for
+     billing/payments products (Razorpay, FreshBooks, Zoho Books all center a blue this tone).
+     Kept as a named alias rather than raw `blue-*` classes so the whole app repaints from one
+     place if the palette ever changes again. */
+  --color-brand-50: #eaf2fe;
+  --color-brand-100: #d3e5fd;
+  --color-brand-200: #a7ccfb;
+  --color-brand-300: #7bb2f9;
+  --color-brand-400: #4f99f7;
+  --color-brand-500: #2b7ff5;
+  --color-brand-600: #1668e3;
+  --color-brand-700: #114fb0;
+  --color-brand-800: #0c3a80;
+  --color-brand-900: #082950;
+
+  /* Navy — the dark chrome color for the sidebar and auth background overlay, distinct from the
+     brand accent (Razorpay's Blade design system pairs a deep prussian-navy chrome with a
+     brighter blue accent rather than using one color for both — the contrast is what reads as
+     "serious fintech" instead of a flat single-hue theme). */
+  --color-navy-950: #081a30;
+  --color-navy-900: #0b2545;
+  --color-navy-800: #123363;
+  --color-navy-700: #1a4380;
 }
 
 body {

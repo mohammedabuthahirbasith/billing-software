@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, setRole, setToken } from '../api'
 import { withMinDelay } from '../lib/withMinDelay'
+import AuthLayout from '../components/AuthLayout'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
@@ -35,8 +36,8 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <Card className="w-full max-w-sm">
+    <AuthLayout>
+      <Card className="w-full max-w-sm shadow-2xl">
         <h1 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Log in</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Email" type="email" value={email}
@@ -52,6 +53,6 @@ export default function Login() {
           No account? <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">Register</Link>
         </p>
       </Card>
-    </div>
+    </AuthLayout>
   )
 }
