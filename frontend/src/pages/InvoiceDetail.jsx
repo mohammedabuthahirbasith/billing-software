@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
@@ -28,7 +29,7 @@ export default function InvoiceDetail() {
         setInvoice(invoiceData)
         setReturns(returnsData)
       })
-      .catch(() => navigate('/invoices'))
+      .catch((err) => reportLoadError(err, navigate, setError))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -81,6 +82,15 @@ export default function InvoiceDetail() {
     } finally {
       setIsReturning(false)
     }
+  }
+
+  if (error && !invoice) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+        <Link to="/invoices" className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>
+      </div>
+    )
   }
 
   if (!invoice) return <p className="text-slate-500">Loading…</p>

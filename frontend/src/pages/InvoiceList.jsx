@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
@@ -8,12 +9,13 @@ import Badge from '../components/Badge'
 
 export default function InvoiceList() {
   const [invoices, setInvoices] = useState(null)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     apiFetch('/api/invoices')
       .then(setInvoices)
-      .catch(() => navigate('/login'))
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   return (
@@ -22,6 +24,8 @@ export default function InvoiceList() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Invoices</h1>
         <Link to="/invoices/new"><Button>New Invoice</Button></Link>
       </div>
+
+      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
       {invoices ? (
         <Card className="overflow-x-auto p-0">
@@ -63,7 +67,7 @@ export default function InvoiceList() {
             </tbody>
           </table>
         </Card>
-      ) : <p className="text-slate-500">Loading…</p>}
+      ) : !error && <p className="text-slate-500">Loading…</p>}
     </div>
   )
 }

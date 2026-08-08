@@ -103,7 +103,7 @@ public class ReturnService {
         try {
             productRepository.flush();
         } catch (ObjectOptimisticLockingFailureException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock changed concurrently, please retry");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock changed concurrently, please retry", e);
         }
 
         Store store = storeRepository.getReferenceById(storeId);

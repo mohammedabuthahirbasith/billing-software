@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
@@ -53,14 +54,14 @@ export default function Reports() {
       const data = await apiFetch(`/api/reports/sales?from=${range.from}&to=${range.to}&topN=10`)
       setReport(data)
     } catch (err) {
-      setError(err.message)
+      reportLoadError(err, navigate, setError)
     }
   }
 
   useEffect(() => {
     apiFetch(`/api/reports/sales?from=${from}&to=${to}&topN=10`)
       .then(setReport)
-      .catch((err) => setError(err.message))
+      .catch((err) => reportLoadError(err, navigate, setError))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

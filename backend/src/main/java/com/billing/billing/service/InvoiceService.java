@@ -98,7 +98,7 @@ public class InvoiceService {
             productRepository.flush();
         } catch (ObjectOptimisticLockingFailureException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Stock changed concurrently on one or more items, please retry");
+                    "Stock changed concurrently on one or more items, please retry", e);
         }
 
         Store store = storeRepository.getReferenceById(storeId);
@@ -151,7 +151,7 @@ public class InvoiceService {
             productRepository.flush();
         } catch (ObjectOptimisticLockingFailureException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Stock changed concurrently while voiding, please retry");
+                    "Stock changed concurrently while voiding, please retry", e);
         }
 
         invoice.setStatus(InvoiceStatus.VOID);
