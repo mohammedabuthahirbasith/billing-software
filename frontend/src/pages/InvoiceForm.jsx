@@ -7,8 +7,11 @@ import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
+import Loading from '../components/Loading'
+import { Table, TableHead, Th, Td, Tr } from '../components/Table'
 import { useToast } from '../hooks/useToast'
-import { useConfirm } from '../hooks/useConfirm'
+import { useDiscardGuard } from '../hooks/useDiscardGuard'
 
 export default function InvoiceForm() {
   const [products, setProducts] = useState(null)
@@ -24,7 +27,6 @@ export default function InvoiceForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
   const showToast = useToast()
-  const confirm = useConfirm()
   const barcodeInputRef = useRef(null)
 
   useEffect(() => {
@@ -110,17 +112,12 @@ export default function InvoiceForm() {
   const estimatedSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const isDirty = cart.length > 0 || customerName.trim() !== '' || customerPhone.trim() !== ''
 
-  async function handleCancelClick(e) {
-    if (!isDirty) return   // let the Link navigate normally
-    e.preventDefault()
-    const ok = await confirm({
-      title: 'Discard this invoice?',
-      message: 'The items and details you entered will be lost.',
-      confirmLabel: 'Discard',
-      danger: true,
-    })
-    if (ok) navigate('/invoices')
-  }
+  const handleCancelClick = useDiscardGuard({
+    isDirty,
+    to: '/invoices',
+    title: 'Discard this invoice?',
+    message: 'The items and details you entered will be lost.',
+  })
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -140,9 +137,7 @@ export default function InvoiceForm() {
               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </label>
-        {barcodeError && (
-          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{barcodeError}</p>
-        )}
+        <ErrorText className="mt-2">{barcodeError}</ErrorText>
 
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-200 pt-6 sm:grid-cols-2">
           <Field label="Customer name (optional)" value={customerName}
@@ -181,32 +176,30 @@ export default function InvoiceForm() {
 
         {cart.length > 0 && (
           <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-2">Product</th>
-                  <th className="px-4 py-2">SKU</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-right">Price</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
+            <Table dense>
+              <TableHead>
+                <Th>Product</Th>
+                <Th>SKU</Th>
+                <Th align="right">Qty</Th>
+                <Th align="right">Price</Th>
+                <Th />
+              </TableHead>
               <tbody>
                 {cart.map((item, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0">
-                    <td className="px-4 py-2 font-medium text-slate-900">{item.name}</td>
-                    <td className="px-4 py-2 text-slate-500">{item.sku}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{item.quantity}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.price)}</td>
-                    <td className="px-4 py-2 text-right">
+                  <Tr key={i}>
+                    <Td className="font-medium text-slate-900">{item.name}</Td>
+                    <Td className="text-slate-500">{item.sku}</Td>
+                    <Td align="right" className="tabular-nums">{item.quantity}</Td>
+                    <Td align="right" className="tabular-nums">{formatCurrency(item.price)}</Td>
+                    <Td align="right">
                       <button type="button" onClick={() => handleRemove(i)} className="font-medium text-rose-600 hover:text-rose-700">
                         Remove
                       </button>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
 
@@ -216,7 +209,7 @@ export default function InvoiceForm() {
           </p>
         )}
 
-        {error && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        <ErrorText className="mt-4">{error}</ErrorText>
 
         <div className="mt-6 flex items-center gap-3">
           <Button onClick={handleSubmit} loading={isSubmitting}>Create Invoice</Button>

@@ -5,10 +5,14 @@ import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
-import Badge from '../components/Badge'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
+import Loading from '../components/Loading'
+import InvoiceStatusBadge from '../components/InvoiceStatusBadge'
+import { Table, TableHead, Th, Td, Tr } from '../components/Table'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
+import { useDiscardGuard } from '../hooks/useDiscardGuard'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
@@ -106,19 +110,6 @@ export default function InvoiceDetail() {
   }
 
   const canReturn = isOwner && invoice.status === 'COMPLETED'
-  const hasReturnInput = Object.values(returnQuantities).some((qty) => Number(qty) > 0)
-
-  async function handleBackClick(e) {
-    if (!hasReturnInput) return   // let the Link navigate normally
-    e.preventDefault()
-    const ok = await confirm({
-      title: 'Discard return quantities?',
-      message: "You've entered return quantities that haven't been submitted yet.",
-      confirmLabel: 'Discard',
-      danger: true,
-    })
-    if (ok) navigate('/invoices')
-  }
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -128,7 +119,7 @@ export default function InvoiceDetail() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{invoice.invoiceNumber}</h1>
             <p className="mt-1 text-sm text-slate-500">{formatDateTime(invoice.createdAt)}</p>
           </div>
-          <Badge tone={invoice.status === 'VOID' ? 'danger' : 'success'}>{invoice.status}</Badge>
+          <InvoiceStatusBadge status={invoice.status} />
         </div>
 
         <div className="mt-4 border-t border-slate-200 pt-4 text-sm text-slate-600">
@@ -138,35 +129,33 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-2">Product</th>
-                <th className="px-4 py-2">SKU</th>
-                <th className="px-4 py-2">HSN</th>
-                <th className="px-4 py-2 text-right">Unit Price</th>
-                <th className="px-4 py-2 text-right">GST %</th>
-                <th className="px-4 py-2 text-right">Qty</th>
-                <th className="px-4 py-2 text-right">Line Total</th>
-                <th className="px-4 py-2 text-right">Returnable</th>
-                {canReturn && <th className="px-4 py-2 text-right">Return Qty</th>}
-              </tr>
-            </thead>
+          <Table dense>
+            <TableHead>
+              <Th>Product</Th>
+              <Th>SKU</Th>
+              <Th>HSN</Th>
+              <Th align="right">Unit Price</Th>
+              <Th align="right">GST %</Th>
+              <Th align="right">Qty</Th>
+              <Th align="right">Line Total</Th>
+              <Th align="right">Returnable</Th>
+              {canReturn && <Th align="right">Return Qty</Th>}
+            </TableHead>
             <tbody>
               {invoice.items.map((item) => {
                 const remaining = item.quantity - (returnedByItemId[item.id] || 0)
                 return (
-                  <tr key={item.id} className="border-b border-slate-100 last:border-0">
-                    <td className="px-4 py-2 font-medium text-slate-900">{item.productName}</td>
-                    <td className="px-4 py-2 text-slate-500">{item.sku}</td>
-                    <td className="px-4 py-2 text-slate-500">{item.hsnCode || '—'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{item.gstRate}%</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{item.quantity}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(item.lineTotal)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-slate-500">{remaining}</td>
+                  <Tr key={item.id}>
+                    <Td className="font-medium text-slate-900">{item.productName}</Td>
+                    <Td className="text-slate-500">{item.sku}</Td>
+                    <Td className="text-slate-500">{item.hsnCode || '—'}</Td>
+                    <Td align="right" className="tabular-nums">{formatCurrency(item.unitPrice)}</Td>
+                    <Td align="right" className="tabular-nums">{item.gstRate}%</Td>
+                    <Td align="right" className="tabular-nums">{item.quantity}</Td>
+                    <Td align="right" className="tabular-nums">{formatCurrency(item.lineTotal)}</Td>
+                    <Td align="right" className="tabular-nums text-slate-500">{remaining}</Td>
                     {canReturn && (
-                      <td className="px-4 py-2 text-right">
+                      <Td align="right">
                         {remaining > 0 && (
                           <input
                             type="number"
@@ -179,13 +168,13 @@ export default function InvoiceDetail() {
                             className="w-16 rounded border border-slate-300 px-2 py-1 text-right tabular-nums focus:border-brand-500 focus:outline-none"
                           />
                         )}
-                      </td>
+                      </Td>
                     )}
-                  </tr>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
+          </Table>
         </div>
 
         <div className="mt-4 flex justify-end">
@@ -205,7 +194,7 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {error && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        <ErrorText className="mt-4">{error}</ErrorText>
 
         <div className="mt-6 flex items-center gap-3 border-t border-slate-200 pt-6">
           <Link to="/invoices" onClick={handleBackClick} className="text-sm font-medium text-slate-600 hover:text-slate-900">← Invoices</Link>

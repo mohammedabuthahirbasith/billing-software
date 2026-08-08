@@ -6,6 +6,7 @@ import AuthLayout from '../components/AuthLayout'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
 import { useToast } from '../hooks/useToast'
 
 export default function Login() {
@@ -44,9 +45,7 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           <Field label="Password" type="password" value={password}
             onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-          {error && (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
-          )}
+          <ErrorText>{error}</ErrorText>
           <Button type="submit" className="w-full" loading={isSubmitting}>Log in</Button>
         </form>
         <p className="mt-6 text-center text-sm text-slate-600">

@@ -1,21 +1,18 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { apiFetch, getRole } from '../api'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { apiFetch } from '../api'
 import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
 import { useToast } from '../hooks/useToast'
-import { useConfirm } from '../hooks/useConfirm'
+import { useDiscardGuard } from '../hooks/useDiscardGuard'
+import { useRequireOwner } from '../hooks/useRequireOwner'
 
 export default function StaffForm() {
-  const navigate = useNavigate()
   const showToast = useToast()
-  const confirm = useConfirm()
-
-  useEffect(() => {
-    if (getRole() !== 'OWNER') navigate('/')   // UX guard only — the backend is the real gate
-  }, [navigate])
+  useRequireOwner()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,17 +40,7 @@ export default function StaffForm() {
     }
   }
 
-  async function handleBackClick(e) {
-    if (!email && !password) return   // let the Link navigate normally
-    e.preventDefault()
-    const ok = await confirm({
-      title: 'Discard changes?',
-      message: 'You have unsaved changes that will be lost.',
-      confirmLabel: 'Discard',
-      danger: true,
-    })
-    if (ok) navigate('/')
-  }
+  const handleBackClick = useDiscardGuard({ isDirty: Boolean(email || password), to: '/' })
 
   return (
     <div className="mx-auto max-w-md">
@@ -69,7 +56,7 @@ export default function StaffForm() {
             <option value="OWNER">Owner</option>
           </Field>
 
-          {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          <ErrorText>{error}</ErrorText>
 
           <div className="flex items-center gap-3 pt-2">
             <Button type="submit" loading={isSubmitting}>Create account</Button>

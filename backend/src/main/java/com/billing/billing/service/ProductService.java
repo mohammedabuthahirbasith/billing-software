@@ -10,33 +10,26 @@ import org.springframework.web.server.ResponseStatusException;
 import com.billing.billing.dto.ProductRequest;
 import com.billing.billing.dto.ProductResponse;
 import com.billing.billing.model.Product;
-import com.billing.billing.model.Store;
 import com.billing.billing.repository.InvoiceItemRepository;
 import com.billing.billing.repository.ProductRepository;
-import com.billing.billing.repository.StoreRepository;
-import com.billing.billing.security.CurrentUser;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
     private final InvoiceItemRepository invoiceItemRepository;
-    private final StoreRepository storeRepository;
+    private final StoreScopedLookup lookup;
 
     public ProductService(ProductRepository productRepository, InvoiceItemRepository invoiceItemRepository,
-                           StoreRepository storeRepository) {
+                           StoreScopedLookup lookup) {
         this.productRepository = productRepository;
         this.invoiceItemRepository = invoiceItemRepository;
-        this.storeRepository = storeRepository;
+        this.lookup = lookup;
     }
 
     public ProductResponse create(ProductRequest request) {
-        Long storeId = CurrentUser.get().storeId();
-        if (productRepository.existsByStore_IdAndSku(storeId, request.sku())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + request.sku());
-        }
+        requireSkuAvailable(request.sku());
 
-        Store store = storeRepository.getReferenceById(storeId);
         Product product = new Product(
                 request.name(),
                 request.sku(),
@@ -45,38 +38,34 @@ public class ProductService {
                 request.gstRate(),
                 request.hsnCode(),
                 request.stockQuantity(),
-                store
+                lookup.currentStoreReference()
         );
 
         return ProductResponse.from(productRepository.save(product));
     }
 
     public List<ProductResponse> getAll() {
-        Long storeId = CurrentUser.get().storeId();
-        return productRepository.findAllByStore_Id(storeId).stream()
+        return productRepository.findAllByStore_Id(lookup.currentStoreId()).stream()
                 .map(ProductResponse::from)
                 .toList();
     }
 
     public ProductResponse getById(Long id) {
-        return ProductResponse.from(findProductOrThrow(id));
+        return ProductResponse.from(lookup.product(id));
     }
 
     public ProductResponse getBySku(String sku) {
-        Long storeId = CurrentUser.get().storeId();
-        Product product = productRepository.findByStore_IdAndSku(storeId, sku)
+        Product product = productRepository.findByStore_IdAndSku(lookup.currentStoreId(), sku)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No product found for barcode: " + sku));
         return ProductResponse.from(product);
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
-        Long storeId = CurrentUser.get().storeId();
-        Product product = findProductOrThrow(id);
+        Product product = lookup.product(id);
 
-        boolean skuChanged = !product.getSku().equals(request.sku());
-        if (skuChanged && productRepository.existsByStore_IdAndSku(storeId, request.sku())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + request.sku());
+        if (!product.getSku().equals(request.sku())) {
+            requireSkuAvailable(request.sku());
         }
 
         product.setName(request.name());
@@ -92,18 +81,18 @@ public class ProductService {
     }
 
     public void delete(Long id) {
-        Long storeId = CurrentUser.get().storeId();
-        Product product = findProductOrThrow(id);
-        if (invoiceItemRepository.existsByProduct_IdAndProduct_Store_Id(id, storeId)) {
+        Product product = lookup.product(id);
+        if (invoiceItemRepository.existsByProduct_IdAndProduct_Store_Id(id, lookup.currentStoreId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Cannot delete product with existing invoice history: " + id);
         }
         productRepository.delete(product);
     }
 
-    private Product findProductOrThrow(Long id) {
-        Long storeId = CurrentUser.get().storeId();
-        return productRepository.findByIdAndStore_Id(id, storeId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + id));
+    // SKU is unique per store, not globally — the check has to be store-scoped on both write paths.
+    private void requireSkuAvailable(String sku) {
+        if (productRepository.existsByStore_IdAndSku(lookup.currentStoreId(), sku)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + sku);
+        }
     }
 }
