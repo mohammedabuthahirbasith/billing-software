@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
 import { useToast } from '../hooks/useToast'
-import { useConfirm } from '../hooks/useConfirm'
+import { useDiscardGuard } from '../hooks/useDiscardGuard'
 
 export default function ProductForm() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const showToast = useToast()
-  const confirm = useConfirm()
 
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
@@ -48,8 +49,8 @@ export default function ProductForm() {
         setHsnCode(p.hsnCode ?? '')
         setStockQuantity(String(p.stockQuantity))
       })
-      .catch((err) => setError(err.message))
-  }, [id, isEdit])
+      .catch((err) => reportLoadError(err, navigate, setError))
+  }, [id, isEdit, navigate])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -79,17 +80,7 @@ export default function ProductForm() {
     }
   }
 
-  async function handleCancelClick(e) {
-    if (!isDirty) return   // let the Link navigate normally
-    e.preventDefault()
-    const ok = await confirm({
-      title: 'Discard changes?',
-      message: 'You have unsaved changes that will be lost.',
-      confirmLabel: 'Discard',
-      danger: true,
-    })
-    if (ok) navigate('/products')
-  }
+  const handleCancelClick = useDiscardGuard({ isDirty, to: '/products' })
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -115,7 +106,7 @@ export default function ProductForm() {
               onChange={field(setStockQuantity)} required />
           </div>
 
-          {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+          <ErrorText>{error}</ErrorText>
 
           <div className="flex items-center gap-3 pt-2">
             <Button type="submit" loading={isSubmitting}>{isEdit ? 'Save' : 'Create'}</Button>

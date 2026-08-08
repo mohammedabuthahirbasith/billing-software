@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
+import ErrorText from '../components/ErrorText'
+import Loading from '../components/Loading'
+import { Table, TableHead, Th, Td, Tr, EmptyRow } from '../components/Table'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
 
@@ -20,7 +24,7 @@ export default function ProductList() {
   useEffect(() => {
     apiFetch('/api/products')
       .then(setProducts)
-      .catch(() => navigate('/login'))
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   async function handleDelete(id, name) {
@@ -51,31 +55,29 @@ export default function ProductList() {
         {isOwner && <Link to="/products/new"><Button>Add product</Button></Link>}
       </div>
 
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+      <ErrorText>{error}</ErrorText>
 
       {products ? (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3 text-right">GST %</th>
-                <th className="px-4 py-3 text-right">Stock</th>
-                {isOwner && <th className="px-4 py-3"></th>}
-              </tr>
-            </thead>
+          <Table>
+            <TableHead>
+              <Th>Name</Th>
+              <Th>SKU</Th>
+              <Th align="right">Price</Th>
+              <Th align="right">GST %</Th>
+              <Th align="right">Stock</Th>
+              {isOwner && <Th />}
+            </TableHead>
             <tbody>
               {products.map((p) => (
-                <tr key={p.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{p.name}</td>
-                  <td className="px-4 py-3 text-slate-500">{p.sku}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(p.price)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{p.gstRate}%</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{p.stockQuantity}</td>
+                <Tr key={p.id} hover>
+                  <Td className="font-medium text-slate-900">{p.name}</Td>
+                  <Td className="text-slate-500">{p.sku}</Td>
+                  <Td align="right" className="tabular-nums">{formatCurrency(p.price)}</Td>
+                  <Td align="right" className="tabular-nums">{p.gstRate}%</Td>
+                  <Td align="right" className="tabular-nums">{p.stockQuantity}</Td>
                   {isOwner && (
-                    <td className="px-4 py-3 text-right">
+                    <Td align="right">
                       <div className="flex justify-end gap-3">
                         <Link to={`/products/${p.id}/edit`} className="font-medium text-brand-600 hover:text-brand-700">
                           Edit
@@ -85,19 +87,17 @@ export default function ProductList() {
                           {deletingId === p.id ? 'Deleting…' : 'Delete'}
                         </button>
                       </div>
-                    </td>
+                    </Td>
                   )}
-                </tr>
+                </Tr>
               ))}
               {products.length === 0 && (
-                <tr>
-                  <td colSpan={isOwner ? 6 : 5} className="px-4 py-8 text-center text-slate-500">No products yet.</td>
-                </tr>
+                <EmptyRow colSpan={isOwner ? 6 : 5}>No products yet.</EmptyRow>
               )}
             </tbody>
-          </table>
+          </Table>
         </Card>
-      ) : <p className="text-slate-500">Loading…</p>}
+      ) : !error && <p className="text-slate-500">Loading…</p>}
     </div>
   )
 }

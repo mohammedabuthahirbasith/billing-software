@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
-import Badge from '../components/Badge'
+import Loading from '../components/Loading'
+import InvoiceStatusBadge from '../components/InvoiceStatusBadge'
+import { Table, TableHead, Th, Td, Tr, EmptyRow } from '../components/Table'
 
 export default function InvoiceList() {
   const [invoices, setInvoices] = useState(null)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     apiFetch('/api/invoices')
       .then(setInvoices)
-      .catch(() => navigate('/login'))
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   return (
@@ -23,47 +27,41 @@ export default function InvoiceList() {
         <Link to="/invoices/new"><Button>New Invoice</Button></Link>
       </div>
 
+      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+
       {invoices ? (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Invoice #</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3">Payment</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
+          <Table>
+            <TableHead>
+              <Th>Invoice #</Th>
+              <Th>Customer</Th>
+              <Th align="right">Total</Th>
+              <Th>Payment</Th>
+              <Th>Status</Th>
+              <Th>Created</Th>
+              <Th />
+            </TableHead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                  <td className="px-4 py-3 text-slate-500">{inv.customerName || '—'}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(inv.totalAmount)}</td>
-                  <td className="px-4 py-3 text-slate-500">{inv.paymentMethod}</td>
-                  <td className="px-4 py-3">
-                    <Badge tone={inv.status === 'VOID' ? 'danger' : 'success'}>{inv.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(inv.createdAt)}</td>
-                  <td className="px-4 py-3 text-right">
+                <Tr key={inv.id} hover>
+                  <Td className="font-medium text-slate-900">{inv.invoiceNumber}</Td>
+                  <Td className="text-slate-500">{inv.customerName || '—'}</Td>
+                  <Td align="right" className="tabular-nums">{formatCurrency(inv.totalAmount)}</Td>
+                  <Td className="text-slate-500">{inv.paymentMethod}</Td>
+                  <Td><InvoiceStatusBadge status={inv.status} /></Td>
+                  <Td className="text-slate-500">{formatDateTime(inv.createdAt)}</Td>
+                  <Td align="right">
                     <Link to={`/invoices/${inv.id}`} className="font-medium text-brand-600 hover:text-brand-700">
                       View
                     </Link>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
-              {invoices.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No invoices yet.</td>
-                </tr>
-              )}
+              {invoices.length === 0 && <EmptyRow colSpan={7}>No invoices yet.</EmptyRow>}
             </tbody>
-          </table>
+          </Table>
         </Card>
-      ) : <p className="text-slate-500">Loading…</p>}
+      ) : !error && <p className="text-slate-500">Loading…</p>}
     </div>
   )
 }

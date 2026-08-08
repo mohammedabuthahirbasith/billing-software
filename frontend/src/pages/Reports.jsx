@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
 import Button from '../components/Button'
+import StatCard from '../components/StatCard'
+import ErrorText from '../components/ErrorText'
+import Loading from '../components/Loading'
+import { Table, TableHead, Th, Td, Tr, EmptyRow } from '../components/Table'
+import { useRequireOwner } from '../hooks/useRequireOwner'
 
 // Validated categorical slots (blue/orange/aqua) from the design system's reference palette —
 // these three specifically validate as colorblind-safe across ALL pairs, not just adjacent ones,
@@ -12,10 +18,6 @@ const PAYMENT_COLORS = {
   CASH: '#2a78d6',
   CARD: '#eb6834',
   UPI: '#1baf7a',
-}
-
-function toISODate(date) {
-  return date.toISOString().slice(0, 10)
 }
 
 function presetRange(preset) {
@@ -35,11 +37,7 @@ function presetRange(preset) {
 }
 
 export default function Reports() {
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    if (getRole() !== 'OWNER') navigate('/')   // UX guard only — the backend is the real gate
-  }, [navigate])
+  useRequireOwner()
 
   const initial = presetRange('month')
   const [from, setFrom] = useState(initial.from)
@@ -53,14 +51,14 @@ export default function Reports() {
       const data = await apiFetch(`/api/reports/sales?from=${range.from}&to=${range.to}&topN=10`)
       setReport(data)
     } catch (err) {
-      setError(err.message)
+      reportLoadError(err, navigate, setError)
     }
   }
 
   useEffect(() => {
     apiFetch(`/api/reports/sales?from=${from}&to=${to}&topN=10`)
       .then(setReport)
-      .catch((err) => setError(err.message))
+      .catch((err) => reportLoadError(err, navigate, setError))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -106,27 +104,15 @@ export default function Reports() {
         </div>
       </Card>
 
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+      <ErrorText>{error}</ErrorText>
 
       {report ? (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Card>
-              <p className="text-sm text-slate-500">Total Revenue</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{formatCurrency(report.totalRevenue)}</p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-500">GST Collected</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{formatCurrency(report.totalTax)}</p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-500">Invoices</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{report.invoiceCount}</p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-500">Voided</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-rose-600">{report.voidedCount}</p>
-            </Card>
+            <StatCard label="Total Revenue" value={formatCurrency(report.totalRevenue)} />
+            <StatCard label="GST Collected" value={formatCurrency(report.totalTax)} />
+            <StatCard label="Invoices" value={report.invoiceCount} />
+            <StatCard label="Voided" value={report.voidedCount} tone="danger" />
           </div>
 
           <Card>
@@ -154,34 +140,30 @@ export default function Reports() {
 
           <Card className="overflow-x-auto p-0">
             <h2 className="px-4 pt-4 text-lg font-semibold text-slate-900">Top Products</h2>
-            <table className="mt-3 w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3 text-right">Qty Sold</th>
-                  <th className="px-4 py-3 text-right">Revenue</th>
-                </tr>
-              </thead>
+            <Table className="mt-3">
+              <TableHead>
+                <Th>Product</Th>
+                <Th>SKU</Th>
+                <Th align="right">Qty Sold</Th>
+                <Th align="right">Revenue</Th>
+              </TableHead>
               <tbody>
                 {report.topProducts.map((p) => (
-                  <tr key={p.productId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.productName}</td>
-                    <td className="px-4 py-3 text-slate-500">{p.sku}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{p.quantitySold}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(p.revenue)}</td>
-                  </tr>
+                  <Tr key={p.productId} hover>
+                    <Td className="font-medium text-slate-900">{p.productName}</Td>
+                    <Td className="text-slate-500">{p.sku}</Td>
+                    <Td align="right" className="tabular-nums">{p.quantitySold}</Td>
+                    <Td align="right" className="tabular-nums">{formatCurrency(p.revenue)}</Td>
+                  </Tr>
                 ))}
                 {report.topProducts.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">No sales in this range.</td>
-                  </tr>
+                  <EmptyRow colSpan={4}>No sales in this range.</EmptyRow>
                 )}
               </tbody>
-            </table>
+            </Table>
           </Card>
         </>
-      ) : !error && <p className="text-slate-500">Loading…</p>}
+      ) : !error && <Loading />}
     </div>
   )
 }

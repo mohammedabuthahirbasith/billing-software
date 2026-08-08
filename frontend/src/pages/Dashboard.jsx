@@ -1,38 +1,50 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
-import Badge from '../components/Badge'
-
-function toISODate(date) {
-  return date.toISOString().slice(0, 10)
-}
+import StatCard from '../components/StatCard'
+import Loading from '../components/Loading'
+import InvoiceStatusBadge from '../components/InvoiceStatusBadge'
+import { Table, TableHead, Th, Td, Tr, EmptyRow } from '../components/Table'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [todayReport, setTodayReport] = useState(null)
   const [recentInvoices, setRecentInvoices] = useState(null)
+  const [error, setError] = useState(null)
+  const [widgetError, setWidgetError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     apiFetch('/api/me')
       .then(setUser)
-      .catch(() => navigate('/login'))   // token invalid/expired
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   // Waits for /api/me to resolve first so a CASHIER's dashboard never fires the OWNER-only
   // reports call at all (avoids a noisy, entirely expected 403 on every load).
   useEffect(() => {
     if (!user) return
-    apiFetch('/api/invoices').then((invoices) => setRecentInvoices(invoices.slice(0, 5)))
+    // These two are secondary to the page: a failure degrades a widget rather than the whole
+    // dashboard, so it is shown in a banner instead of redirecting. It still has to be handled —
+    // without a rejection handler these failed silently as unhandled rejections, leaving the
+    // widgets stuck on "Loading…" with no indication anything had gone wrong.
+    apiFetch('/api/invoices')
+      .then((invoices) => setRecentInvoices(invoices.slice(0, 5)))
+      .catch((err) => reportLoadError(err, navigate, setWidgetError))
     if (user.role === 'OWNER') {
       const today = toISODate(new Date())
-      apiFetch(`/api/reports/sales?from=${today}&to=${today}&topN=5`).then(setTodayReport)
+      apiFetch(`/api/reports/sales?from=${today}&to=${today}&topN=5`)
+        .then(setTodayReport)
+        .catch((err) => reportLoadError(err, navigate, setWidgetError))
     }
-  }, [user])
+  }, [user, navigate])
 
-  if (!user) return <p className="text-slate-500">Loading…</p>
+  if (error) return <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+
+  if (!user) return <Loading />
 
   const isOwner = user.role === 'OWNER'
 
@@ -43,24 +55,13 @@ export default function Dashboard() {
         <p className="mt-1 text-sm text-slate-500">{user.storeName} — Signed in as {user.role}</p>
       </Card>
 
+      {widgetError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{widgetError}</p>}
+
       {isOwner && todayReport && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <p className="text-sm text-slate-500">Today's Revenue</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-              {formatCurrency(todayReport.totalRevenue)}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Today's GST</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-              {formatCurrency(todayReport.totalTax)}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Today's Invoices</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{todayReport.invoiceCount}</p>
-          </Card>
+          <StatCard label="Today's Revenue" value={formatCurrency(todayReport.totalRevenue)} />
+          <StatCard label="Today's GST" value={formatCurrency(todayReport.totalTax)} />
+          <StatCard label="Today's Invoices" value={todayReport.invoiceCount} />
         </div>
       )}
 
@@ -104,31 +105,23 @@ export default function Dashboard() {
             View all
           </Link>
         </div>
-        <table className="mt-3 w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Created</th>
-            </tr>
-          </thead>
+        <Table className="mt-3">
+          <TableHead>
+            <Th>Invoice #</Th>
+            <Th>Customer</Th>
+            <Th align="right">Total</Th>
+            <Th>Status</Th>
+            <Th>Created</Th>
+          </TableHead>
           <tbody>
             {recentInvoices?.map((inv) => (
-              <tr
-                key={inv.id}
-                onClick={() => navigate(`/invoices/${inv.id}`)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
-              >
-                <td className="px-4 py-3 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                <td className="px-4 py-3 text-slate-500">{inv.customerName || '—'}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(inv.totalAmount)}</td>
-                <td className="px-4 py-3">
-                  <Badge tone={inv.status === 'VOID' ? 'danger' : 'success'}>{inv.status}</Badge>
-                </td>
-                <td className="px-4 py-3 text-slate-500">{formatDateTime(inv.createdAt)}</td>
-              </tr>
+              <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <Td className="font-medium text-slate-900">{inv.invoiceNumber}</Td>
+                <Td className="text-slate-500">{inv.customerName || '—'}</Td>
+                <Td align="right" className="tabular-nums">{formatCurrency(inv.totalAmount)}</Td>
+                <Td><InvoiceStatusBadge status={inv.status} /></Td>
+                <Td className="text-slate-500">{formatDateTime(inv.createdAt)}</Td>
+              </Tr>
             ))}
             {recentInvoices && recentInvoices.length === 0 && (
               <tr>
@@ -137,11 +130,14 @@ export default function Dashboard() {
             )}
             {!recentInvoices && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading…</td>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  {widgetError ? 'Could not load recent invoices.' : 'Loading…'}
+                </td>
               </tr>
             )}
+            {!recentInvoices && <EmptyRow colSpan={5}>Loading…</EmptyRow>}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </div>
   )
