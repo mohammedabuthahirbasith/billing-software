@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.billing.billing.model.Invoice;
+import com.billing.billing.util.InvoiceNumber;
 
 public record InvoiceSummaryResponse(
         Long id,
@@ -21,7 +22,7 @@ public record InvoiceSummaryResponse(
     public static InvoiceSummaryResponse from(Invoice invoice) {
         return new InvoiceSummaryResponse(
                 invoice.getId(),
-                "INV-%06d".formatted(invoice.getId()),
+                InvoiceNumber.of(invoice.getId()),
                 invoice.getCustomerName(),
                 invoice.getCustomerPhone(),
                 invoice.getSubtotal(),
