@@ -39,7 +39,7 @@ public class SecurityConfig {
                 ))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new RegisterRateLimitFilter(),
+                .addFilterBefore(new AuthRateLimitFilter(),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

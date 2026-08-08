@@ -8,7 +8,8 @@ import jakarta.validation.constraints.Size;
 import com.billing.billing.model.Role;
 
 public record CreateUserRequest(
-        @NotBlank @Email String email,
-        @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password,
+        @NotBlank @Email @Size(max = 255) String email,
+        // Same 8..72 bound as RegisterRequest — see the note there on BCrypt's 72-byte truncation.
+        @NotBlank @Size(min = 8, max = 72, message = "Password must be between 8 and 72 characters") String password,
         @NotNull Role role
 ) {}
