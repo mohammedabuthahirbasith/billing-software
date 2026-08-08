@@ -15,7 +15,6 @@ import com.billing.billing.model.Store;
 import com.billing.billing.model.User;
 import com.billing.billing.repository.StoreRepository;
 import com.billing.billing.repository.UserRepository;
-import com.billing.billing.security.CurrentUser;
 import com.billing.billing.security.JwtService;
 
 @Service
@@ -23,13 +22,15 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final StoreRepository storeRepository;
+    private final StoreScopedLookup lookup;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, StoreRepository storeRepository,
+    public AuthService(UserRepository userRepository, StoreRepository storeRepository, StoreScopedLookup lookup,
                         PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.storeRepository = storeRepository;
+        this.lookup = lookup;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -42,13 +43,11 @@ public class AuthService {
 
     // OWNER-only, called from UserController — provisions a staff login (typically CASHIER) within
     // the CURRENT authenticated user's existing store. Never creates a new store.
-    // findById, not getReferenceById: createUser() below always reads store.getName() for the
-    // response, so the lazy-proxy optimization doesn't apply here and would only throw once this
-    // method (and its session) has already returned.
+    // currentStore(), not currentStoreReference(): createUser() below always reads store.getName()
+    // for the response, so the lazy-proxy optimization doesn't apply here and would only throw once
+    // this method (and its session) has already returned.
     public UserResponse createStaffUser(CreateUserRequest request) {
-        Store store = storeRepository.findById(CurrentUser.get().storeId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Store not found"));
-        return createUser(request.email(), request.password(), request.role(), store);
+        return createUser(request.email(), request.password(), request.role(), lookup.currentStore());
     }
 
     private UserResponse createUser(String email, String password, Role role, Store store) {

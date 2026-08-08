@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.billing.billing.model.Invoice;
+import com.billing.billing.util.InvoiceNumber;
 
 public record InvoiceResponse(
         Long id,
@@ -23,7 +24,7 @@ public record InvoiceResponse(
     public static InvoiceResponse from(Invoice invoice) {
         return new InvoiceResponse(
                 invoice.getId(),
-                "INV-%06d".formatted(invoice.getId()),
+                InvoiceNumber.of(invoice.getId()),
                 invoice.getCustomerName(),
                 invoice.getCustomerPhone(),
                 invoice.getSubtotal(),

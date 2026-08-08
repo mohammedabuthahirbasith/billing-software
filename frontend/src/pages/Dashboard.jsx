@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
-import { formatCurrency, formatDateTime } from '../lib/format'
+import { formatCurrency, formatDateTime, toISODate } from '../lib/format'
 import Card from '../components/Card'
-import Badge from '../components/Badge'
-
-function toISODate(date) {
-  return date.toISOString().slice(0, 10)
-}
+import StatCard from '../components/StatCard'
+import Loading from '../components/Loading'
+import InvoiceStatusBadge from '../components/InvoiceStatusBadge'
+import { Table, TableHead, Th, Td, Tr, EmptyRow } from '../components/Table'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -32,7 +31,7 @@ export default function Dashboard() {
     }
   }, [user])
 
-  if (!user) return <p className="text-slate-500">Loading…</p>
+  if (!user) return <Loading />
 
   const isOwner = user.role === 'OWNER'
 
@@ -45,22 +44,9 @@ export default function Dashboard() {
 
       {isOwner && todayReport && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <p className="text-sm text-slate-500">Today's Revenue</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-              {formatCurrency(todayReport.totalRevenue)}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Today's GST</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-              {formatCurrency(todayReport.totalTax)}
-            </p>
-          </Card>
-          <Card>
-            <p className="text-sm text-slate-500">Today's Invoices</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{todayReport.invoiceCount}</p>
-          </Card>
+          <StatCard label="Today's Revenue" value={formatCurrency(todayReport.totalRevenue)} />
+          <StatCard label="Today's GST" value={formatCurrency(todayReport.totalTax)} />
+          <StatCard label="Today's Invoices" value={todayReport.invoiceCount} />
         </div>
       )}
 
@@ -104,44 +90,30 @@ export default function Dashboard() {
             View all
           </Link>
         </div>
-        <table className="mt-3 w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Invoice #</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3 text-right">Total</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Created</th>
-            </tr>
-          </thead>
+        <Table className="mt-3">
+          <TableHead>
+            <Th>Invoice #</Th>
+            <Th>Customer</Th>
+            <Th align="right">Total</Th>
+            <Th>Status</Th>
+            <Th>Created</Th>
+          </TableHead>
           <tbody>
             {recentInvoices?.map((inv) => (
-              <tr
-                key={inv.id}
-                onClick={() => navigate(`/invoices/${inv.id}`)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
-              >
-                <td className="px-4 py-3 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                <td className="px-4 py-3 text-slate-500">{inv.customerName || '—'}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(inv.totalAmount)}</td>
-                <td className="px-4 py-3">
-                  <Badge tone={inv.status === 'VOID' ? 'danger' : 'success'}>{inv.status}</Badge>
-                </td>
-                <td className="px-4 py-3 text-slate-500">{formatDateTime(inv.createdAt)}</td>
-              </tr>
+              <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <Td className="font-medium text-slate-900">{inv.invoiceNumber}</Td>
+                <Td className="text-slate-500">{inv.customerName || '—'}</Td>
+                <Td align="right" className="tabular-nums">{formatCurrency(inv.totalAmount)}</Td>
+                <Td><InvoiceStatusBadge status={inv.status} /></Td>
+                <Td className="text-slate-500">{formatDateTime(inv.createdAt)}</Td>
+              </Tr>
             ))}
             {recentInvoices && recentInvoices.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No invoices yet.</td>
-              </tr>
+              <EmptyRow colSpan={5}>No invoices yet.</EmptyRow>
             )}
-            {!recentInvoices && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading…</td>
-              </tr>
-            )}
+            {!recentInvoices && <EmptyRow colSpan={5}>Loading…</EmptyRow>}
           </tbody>
-        </table>
+        </Table>
       </Card>
     </div>
   )
