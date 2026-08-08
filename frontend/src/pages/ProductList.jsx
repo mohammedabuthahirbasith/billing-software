@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, getRole } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
@@ -23,7 +24,7 @@ export default function ProductList() {
   useEffect(() => {
     apiFetch('/api/products')
       .then(setProducts)
-      .catch(() => navigate('/login'))
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   async function handleDelete(id, name) {
@@ -96,7 +97,7 @@ export default function ProductList() {
             </tbody>
           </Table>
         </Card>
-      ) : <Loading />}
+      ) : !error && <p className="text-slate-500">Loading…</p>}
     </div>
   )
 }

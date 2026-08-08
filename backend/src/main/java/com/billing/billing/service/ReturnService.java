@@ -81,7 +81,11 @@ public class ReturnService {
             stockAdjuster.adjust(invoiceItem.getProduct(), lineRequest.quantity());
         }
 
-        stockAdjuster.flushOrConflict("Stock changed concurrently, please retry");
+        try {
+            productRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock changed concurrently, please retry", e);
+        }
 
         InvoiceReturn invoiceReturn = new InvoiceReturn(lookup.currentStoreReference(), invoice, refundSubtotal,
                 refundTax, refundSubtotal.add(refundTax));

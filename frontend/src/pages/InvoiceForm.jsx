@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import { formatCurrency } from '../lib/format'
 import Card from '../components/Card'
@@ -31,7 +32,7 @@ export default function InvoiceForm() {
   useEffect(() => {
     apiFetch('/api/products')
       .then(setProducts)
-      .catch(() => navigate('/login'))
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   useEffect(() => {
@@ -170,7 +171,7 @@ export default function InvoiceForm() {
               </div>
               <Button type="button" variant="secondary" onClick={handleAddToCart}>Add</Button>
             </div>
-          ) : <Loading label="Loading products…" />}
+          ) : <p className="text-slate-500">{error ? 'Products could not be loaded.' : 'Loading products…'}</p>}
         </div>
 
         {cart.length > 0 && (

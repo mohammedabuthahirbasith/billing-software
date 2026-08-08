@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
-import { formatCurrency, formatDateTime, toISODate } from '../lib/format'
+import { reportLoadError } from '../lib/loadError'
+import { formatCurrency, formatDateTime } from '../lib/format'
 import Card from '../components/Card'
 import StatCard from '../components/StatCard'
 import Loading from '../components/Loading'
@@ -12,24 +13,36 @@ export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [todayReport, setTodayReport] = useState(null)
   const [recentInvoices, setRecentInvoices] = useState(null)
+  const [error, setError] = useState(null)
+  const [widgetError, setWidgetError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     apiFetch('/api/me')
       .then(setUser)
-      .catch(() => navigate('/login'))   // token invalid/expired
+      .catch((err) => reportLoadError(err, navigate, setError))
   }, [navigate])
 
   // Waits for /api/me to resolve first so a CASHIER's dashboard never fires the OWNER-only
   // reports call at all (avoids a noisy, entirely expected 403 on every load).
   useEffect(() => {
     if (!user) return
-    apiFetch('/api/invoices').then((invoices) => setRecentInvoices(invoices.slice(0, 5)))
+    // These two are secondary to the page: a failure degrades a widget rather than the whole
+    // dashboard, so it is shown in a banner instead of redirecting. It still has to be handled —
+    // without a rejection handler these failed silently as unhandled rejections, leaving the
+    // widgets stuck on "Loading…" with no indication anything had gone wrong.
+    apiFetch('/api/invoices')
+      .then((invoices) => setRecentInvoices(invoices.slice(0, 5)))
+      .catch((err) => reportLoadError(err, navigate, setWidgetError))
     if (user.role === 'OWNER') {
       const today = toISODate(new Date())
-      apiFetch(`/api/reports/sales?from=${today}&to=${today}&topN=5`).then(setTodayReport)
+      apiFetch(`/api/reports/sales?from=${today}&to=${today}&topN=5`)
+        .then(setTodayReport)
+        .catch((err) => reportLoadError(err, navigate, setWidgetError))
     }
-  }, [user])
+  }, [user, navigate])
+
+  if (error) return <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
 
   if (!user) return <Loading />
 
@@ -41,6 +54,8 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Welcome, {user.email}</h1>
         <p className="mt-1 text-sm text-slate-500">{user.storeName} — Signed in as {user.role}</p>
       </Card>
+
+      {widgetError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{widgetError}</p>}
 
       {isOwner && todayReport && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -109,7 +124,16 @@ export default function Dashboard() {
               </Tr>
             ))}
             {recentInvoices && recentInvoices.length === 0 && (
-              <EmptyRow colSpan={5}>No invoices yet.</EmptyRow>
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No invoices yet.</td>
+              </tr>
+            )}
+            {!recentInvoices && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  {widgetError ? 'Could not load recent invoices.' : 'Loading…'}
+                </td>
+              </tr>
             )}
             {!recentInvoices && <EmptyRow colSpan={5}>Loading…</EmptyRow>}
           </tbody>

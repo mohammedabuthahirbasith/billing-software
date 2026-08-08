@@ -72,7 +72,16 @@ public class InvoiceService {
             taxAmount = taxAmount.add(lineTax);
         }
 
-        stockAdjuster.flushOrConflict("Stock changed concurrently on one or more items, please retry");
+        // Explicit flush inside this method (not left to implicit flush-on-commit) so an optimistic-lock
+        // failure is catchable here and mapped to a clean 409 — left implicit, it fires after this method
+        // returns and surfaces as an unhandled 500 instead. One flush after the loop (not per item) trades
+        // specific-SKU error attribution for a single DB round trip — the right call for typical cart sizes.
+        try {
+            productRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Stock changed concurrently on one or more items, please retry", e);
+        }
 
         Invoice invoice = new Invoice(request.customerName(), request.customerPhone(),
                 subtotal, taxAmount, subtotal.add(taxAmount), request.paymentMethod(), lookup.currentStoreReference());
@@ -113,7 +122,16 @@ public class InvoiceService {
         // status flip) — so double-restoration is already prevented transitively, with no @Version
         // needed on Invoice itself.
         for (InvoiceItem item : invoice.getItems()) {
-            stockAdjuster.adjust(item.getProduct(), item.getQuantity());
+            Product product = item.getProduct();
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+            productRepository.save(product);
+        }
+
+        try {
+            productRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Stock changed concurrently while voiding, please retry", e);
         }
         stockAdjuster.flushOrConflict("Stock changed concurrently while voiding, please retry");
 

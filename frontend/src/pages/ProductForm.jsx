@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../api'
+import { reportLoadError } from '../lib/loadError'
 import { withMinDelay } from '../lib/withMinDelay'
 import Card from '../components/Card'
 import Field from '../components/Field'
@@ -48,8 +49,8 @@ export default function ProductForm() {
         setHsnCode(p.hsnCode ?? '')
         setStockQuantity(String(p.stockQuantity))
       })
-      .catch((err) => setError(err.message))
-  }, [id, isEdit])
+      .catch((err) => reportLoadError(err, navigate, setError))
+  }, [id, isEdit, navigate])
 
   async function handleSubmit(e) {
     e.preventDefault()
